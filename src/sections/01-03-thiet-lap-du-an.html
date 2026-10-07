@@ -1,0 +1,235 @@
+<section class="topic" id="thiet-lap-du-an" data-title="Thiết lập dự án">
+  <h2>Thiết lập dự án Compose</h2>
+  <p class="lead">Trước khi viết dòng giao diện đầu tiên, project cần đúng plugin, đúng SDK và đúng bộ thư viện. Mục này đi từ việc tạo project mới bằng Android Studio, giải thích từng file cấu hình, đến cách thêm Compose vào một app View có sẵn.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p>Một project Compose về bản chất vẫn là project Android dùng Gradle, chỉ thêm ba thứ: <strong>Compose Compiler</strong> (plugin Gradle <code>org.jetbrains.kotlin.plugin.compose</code>, biến hàm <code>@Composable</code> thành mã chạy được), cờ <code>buildFeatures { compose = true }</code>, và các <strong>thư viện Compose</strong> (ui, foundation, material3…).</p>
+    <p>Để các thư viện Compose luôn tương thích với nhau, Google phát hành <strong>BOM</strong> (Bill of Materials — "bảng kê vật tư"): một artifact đặc biệt chỉ chứa danh sách version đã được kiểm thử chung. Bạn khai báo version cho BOM một lần, các thư viện Compose còn lại không cần ghi version. Ngoài ra, project hiện đại dùng <strong>version catalog</strong> (<code>gradle/libs.versions.toml</code>) để gom tên và version thư viện vào một chỗ.</p>
+    <div class="callout info"><strong>Lưu ý:</strong> Từ Compose 1.12, project phải dùng <code>compileSdk 37</code> và Android Gradle Plugin (AGP) 9. Plugin Compose Compiler chỉ có từ Kotlin 2.0 trở lên và luôn mang <em>cùng version với Kotlin</em> (ví dụ Kotlin 2.4.10 thì plugin cũng là 2.4.10).</div>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>Bước 1: Tạo project bằng template</h4>
+    <ol>
+      <li>Mở Android Studio, chọn <strong>New Project</strong>.</li>
+      <li>Ở nhóm <strong>Phone and Tablet</strong>, chọn template <strong>Empty Activity</strong> (template có biểu tượng Compose; đừng nhầm với <em>Empty Views Activity</em> dùng XML).</li>
+      <li>Điền <strong>Name</strong> (ví dụ <code>MyNotes</code>), <strong>Package name</strong> (ví dụ <code>com.example.mynotes</code>), chọn <strong>Minimum SDK</strong> và ngôn ngữ cấu hình build là Kotlin DSL (<code>build.gradle.kts</code>).</li>
+      <li>Bấm <strong>Finish</strong> và chờ Gradle sync xong (lần đầu có thể mất vài phút để tải thư viện).</li>
+      <li>Bấm <strong>Run</strong> để chạy app mẫu trên máy ảo hoặc điện thoại thật.</li>
+    </ol>
+
+    <h4>Bước 2: Hiểu cấu trúc thư mục</h4>
+    <div class="table-wrap"><table>
+      <thead>
+        <tr><th>Đường dẫn</th><th>Vai trò</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>settings.gradle.kts</code></td><td>Tên project, danh sách module, kho tải thư viện (<code>google()</code>, <code>mavenCentral()</code>)</td></tr>
+        <tr><td><code>build.gradle.kts</code> (thư mục gốc)</td><td>Khai báo plugin dùng chung cho các module, thường kèm <code>apply false</code></td></tr>
+        <tr><td><code>gradle/libs.versions.toml</code></td><td>Version catalog: tên, version thư viện và plugin</td></tr>
+        <tr><td><code>gradle.properties</code></td><td>Tùy chọn Gradle (bộ nhớ JVM, các cờ AndroidX…)</td></tr>
+        <tr><td><code>app/build.gradle.kts</code></td><td>Cấu hình module app: plugin, SDK, <code>buildFeatures</code>, dependency</td></tr>
+        <tr><td><code>app/src/main/AndroidManifest.xml</code></td><td>Khai báo Activity, quyền, theme cửa sổ</td></tr>
+        <tr><td><code>app/src/main/java/…/MainActivity.kt</code></td><td>Điểm vào của app, gọi <code>setContent</code></td></tr>
+        <tr><td><code>app/src/main/java/…/ui/theme/</code></td><td><code>Color.kt</code>, <code>Type.kt</code>, <code>Theme.kt</code>: theme Material 3 của app</td></tr>
+        <tr><td><code>app/src/main/res/</code></td><td>Tài nguyên: chuỗi, drawable, icon app (mipmap)</td></tr>
+        <tr><td><code>app/src/test/</code>, <code>app/src/androidTest/</code></td><td>Unit test chạy trên JVM và test chạy trên thiết bị (gồm UI test)</td></tr>
+      </tbody>
+    </table></div>
+
+    <h4>Bước 3: BOM và cách ghi đè version</h4>
+    <p>Khai báo BOM bằng <code>platform(…)</code>, sau đó các thư viện Compose không ghi version. Nếu cần một thư viện mới hơn bản trong BOM (ví dụ để thử tính năng mới), chỉ cần ghi version tường minh cho riêng thư viện đó — version bạn ghi sẽ được ưu tiên, các thư viện khác vẫn theo BOM.</p>
+    <pre><code class="language-kotlin">dependencies {
+    implementation(platform("androidx.compose:compose-bom:2026.09.00"))
+    implementation("androidx.compose.material3:material3")       // theo BOM: 1.4.0
+    implementation("androidx.compose.foundation:foundation")     // theo BOM: 1.12.1
+
+    // Ghi đè: ghi version cụ thể cho riêng một thư viện (số version chỉ minh họa)
+    // implementation("androidx.compose.animation:animation:1.13.0-alpha01")
+}</code></pre>
+    <p>BOM chỉ quản lý thư viện trong nhóm <code>androidx.compose.*</code>. Các thư viện khác như <code>activity-compose</code>, <code>lifecycle-*</code>, <code>navigation-compose</code> vẫn phải ghi version riêng.</p>
+
+    <h4>Bước 4: Thêm Compose vào project View có sẵn</h4>
+    <ol>
+      <li>Đảm bảo project dùng Kotlin 2.0+, AGP 9 và <code>compileSdk = 37</code>.</li>
+      <li>Thêm plugin <code>org.jetbrains.kotlin.plugin.compose</code> (cùng version Kotlin) vào file build gốc với <code>apply false</code> và vào module app.</li>
+      <li>Bật <code>buildFeatures { compose = true }</code> trong khối <code>android</code> của module.</li>
+      <li>Thêm BOM và các thư viện Compose (xem ví dụ 1).</li>
+      <li>Dùng Compose ở nơi cần: cả màn hình bằng <code>setContent</code> trong Activity, hoặc một phần màn hình bằng <code>ComposeView</code> (ví dụ 3). Chi tiết ở <a href="#interop">Tương thích View</a>.</li>
+    </ol>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>Ví dụ 1: Bộ file cấu hình hoàn chỉnh</h4>
+    <p class="code-caption">gradle/libs.versions.toml</p>
+    <pre><code class="language-toml">[versions]
+agp = "9.4.0"
+kotlin = "2.4.10"
+composeBom = "2026.09.00"
+activityCompose = "1.13.0"
+lifecycle = "2.11.0"
+junit = "4.13.2"
+androidxJunit = "1.3.0"
+
+[libraries]
+androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
+androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
+androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+androidx-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
+androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
+androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycle" }
+androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxJunit" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }</code></pre>
+    <p class="code-caption">build.gradle.kts (thư mục gốc)</p>
+    <pre><code class="language-kotlin">plugins {
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.kotlin.compose) apply false
+}</code></pre>
+    <p class="code-caption">app/build.gradle.kts</p>
+    <pre><code class="language-kotlin">plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.compose)
+}
+
+android {
+    namespace = "com.example.mynotes"
+    compileSdk = 37
+
+    defaultConfig {
+        applicationId = "com.example.mynotes"
+        minSdk = 24
+        targetSdk = 37
+        versionCode = 1
+        versionName = "1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = true // bật R8: Compose chạy nhanh hơn rõ rệt ở bản release
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        compose = true
+    }
+}
+
+dependencies {
+    val composeBom = platform(libs.androidx.compose.bom)
+    implementation(composeBom)
+    androidTestImplementation(composeBom)
+
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    debugImplementation(libs.androidx.compose.ui.tooling)
+
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Gradle sync thành công; trong code bạn dùng được <code>MaterialTheme</code>, <code>Text</code>, <code>@Preview</code>… Gạch nối trong tên catalog (<code>androidx-compose-bom</code>) trở thành dấu chấm khi dùng (<code>libs.androidx.compose.bom</code>).</p>
+    <div class="callout info"><strong>Lưu ý:</strong> AGP 9 đã tích hợp sẵn Kotlin (built-in Kotlin), nên module không còn áp dụng plugin <code>org.jetbrains.kotlin.android</code>. Project cũ nâng lên AGP 9 cần gỡ plugin này và chuyển khối <code>kotlinOptions</code> sang <code>kotlin { compilerOptions { … } }</code>. Plugin Compose Compiler thì vẫn phải khai báo như trên.</div>
+
+    <h4>Ví dụ 2: MainActivity và theme</h4>
+    <p class="code-caption">MainActivity.kt</p>
+    <pre><code class="language-kotlin">class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge() // gọi trước setContent
+        setContent {
+            MyNotesTheme {
+                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding -&gt;
+                    Greeting(
+                        name = "Compose",
+                        modifier = Modifier.padding(innerPadding)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun Greeting(name: String, modifier: Modifier = Modifier) {
+    Text(text = "Xin chào $name!", modifier = modifier)
+}</code></pre>
+    <p class="code-caption">ui/theme/Theme.kt (rút gọn)</p>
+    <pre><code class="language-kotlin">@Composable
+fun MyNotesTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    content: @Composable () -&gt; Unit
+) {
+    val colorScheme = if (darkTheme) darkColorScheme() else lightColorScheme()
+    MaterialTheme(
+        colorScheme = colorScheme,
+        content = content
+    )
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> App vẽ tràn viền (nội dung nằm sau thanh trạng thái và thanh điều hướng), nhưng nhờ <code>innerPadding</code> của <code>Scaffold</code> nên dòng "Xin chào Compose!" không bị che. Màu tự đổi theo chế độ sáng/tối của máy. Xem thêm <a href="#edge-to-edge">Tràn viền</a> và <a href="#custom-theme">Tùy biến theme</a>.</p>
+
+    <h4>Ví dụ 3: Nhúng Compose vào layout XML cũ</h4>
+    <p class="code-caption">res/layout/activity_profile.xml (một phần)</p>
+    <pre><code class="language-markup">&lt;androidx.compose.ui.platform.ComposeView
+    android:id="@+id/compose_banner"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content" /&gt;</code></pre>
+    <p class="code-caption">ProfileActivity.kt</p>
+    <pre><code class="language-kotlin">class ProfileActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_profile)
+
+        findViewById&lt;ComposeView&gt;(R.id.compose_banner).setContent {
+            MaterialTheme {
+                Text(
+                    text = "Phần này được viết bằng Compose",
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Màn hình XML cũ vẫn giữ nguyên, riêng vị trí của <code>ComposeView</code> hiển thị dòng chữ do Compose vẽ. Đây là cách chuyển đổi dần từng phần.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li><strong>Plugin Compose lệch version Kotlin:</strong> <code>org.jetbrains.kotlin.plugin.compose</code> phải trùng version với Kotlin mà project dùng. Dùng chung một biến <code>kotlin</code> trong version catalog để không bao giờ lệch.</li>
+      <li><strong>Dùng Kotlin 2.x mà không khai báo plugin Compose:</strong> build sẽ báo lỗi yêu cầu Compose Compiler Gradle plugin. Cách cũ <code>composeOptions { kotlinCompilerExtensionVersion = … }</code> chỉ dành cho Kotlin 1.x, không dùng nữa.</li>
+      <li><strong>Quên <code>buildFeatures { compose = true }</code>:</strong> luôn bật cờ này trong module có dùng Compose, nếu không dễ gặp lỗi build hoặc preview không hoạt động.</li>
+      <li><strong>compileSdk thấp:</strong> với BOM 2026.09.00 (Compose 1.12), <code>compileSdk</code> dưới 37 sẽ làm bước kiểm tra AAR metadata báo lỗi yêu cầu biên dịch với API 37. Nâng <code>compileSdk</code> (không bắt buộc nâng <code>targetSdk</code> cùng lúc).</li>
+      <li><strong>Trộn version thủ công:</strong> đừng ghi version cho từng thư viện Compose khi đã có BOM, trừ khi cố ý ghi đè. Ghi lẫn lộn dễ gây xung đột khó tìm.</li>
+      <li><code>ui-tooling</code> chỉ cần ở <code>debugImplementation</code>; <code>ui-tooling-preview</code> ở <code>implementation</code> vì annotation <code>@Preview</code> nằm trong code chính. Xem <a href="#preview">@Preview</a>.</li>
+    </ul>
+    <div class="callout warn"><strong>Cảnh báo:</strong> AGP 9 cần JDK 17 trở lên để chạy Gradle. Nếu sync báo lỗi về phiên bản Java, vào Settings → Build, Execution, Deployment → Build Tools → Gradle và chọn Gradle JDK phù hợp (bản JDK đi kèm Android Studio là lựa chọn an toàn).</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/setup?hl=vi" target="_blank" rel="noopener">Bắt đầu nhanh với Compose</a>, <a href="https://developer.android.com/develop/ui/compose/compiler?hl=vi" target="_blank" rel="noopener">Compose Compiler</a>, <a href="https://developer.android.com/develop/ui/compose/bom?hl=vi" target="_blank" rel="noopener">Dùng BOM</a></p>
+</section>

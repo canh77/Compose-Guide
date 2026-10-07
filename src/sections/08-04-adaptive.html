@@ -1,0 +1,233 @@
+<section class="topic" id="adaptive" data-title="Bố cục thích ứng">
+  <h2>Bố cục thích ứng cho tablet, máy gập và cửa sổ</h2>
+  <p class="lead">App Android ngày nay không chỉ chạy trên điện thoại cầm dọc. Bố cục thích ứng giúp cùng một app tận dụng tốt mọi kích thước cửa sổ, từ điện thoại, máy gập, tablet đến cửa sổ co giãn trên màn hình desktop.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p><strong>Bố cục thích ứng</strong> (adaptive layout) là giao diện tự đổi cách sắp xếp theo không gian cửa sổ đang có. Trên điện thoại, danh bạ hiện một cột, bấm vào mới mở chi tiết. Trên tablet nằm ngang, danh sách và chi tiết nằm cạnh nhau. Thanh điều hướng dưới đáy có thể chuyển thành thanh bên (navigation rail).</p>
+    <p>Vì sao cần? App của bạn có thể chạy trên tablet, máy gập (foldable, mở ra gập lại ngay khi đang dùng), Chromebook (ChromeOS), ở chế độ chia đôi màn hình hoặc trong cửa sổ co giãn tự do trên desktop. Kích thước cửa sổ vì thế có thể đổi bất cứ lúc nào. Ngoài ra, từ Android 16, với app target API 36, trên màn hình lớn (chiều rộng nhỏ nhất từ 600dp) hệ thống có thể bỏ qua các giới hạn về hướng xoay, khả năng đổi kích thước và tỉ lệ khung hình mà app khai báo trong manifest. Nói cách khác, "khóa dọc cho xong" không còn là lối thoát đáng tin.</p>
+    <p>Với XML, bạn thường tạo thư mục kiểu <code>layout-sw600dp</code>. Với Compose, mọi thứ là code Kotlin: bạn đọc <strong>window size class</strong> (nhóm kích thước cửa sổ) rồi rẽ nhánh bằng <code>if</code>/<code>when</code> để chọn bố cục.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+
+    <h4>1. Window size class và các mốc</h4>
+    <p>Thay vì làm việc với từng con số dp, Material chia chiều rộng cửa sổ thành các nhóm có tên:</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Nhóm chiều rộng</th><th>Khoảng</th><th>Trường hợp điển hình</th></tr></thead>
+      <tbody>
+        <tr><td>Compact</td><td>&lt; 600dp</td><td>Điện thoại cầm dọc</td></tr>
+        <tr><td>Medium</td><td>600 – 840dp</td><td>Tablet dọc, máy gập mở ra (dọc)</td></tr>
+        <tr><td>Expanded</td><td>840 – 1200dp</td><td>Tablet ngang, máy gập mở ra (ngang)</td></tr>
+        <tr><td>Large</td><td>1200 – 1600dp</td><td>Tablet lớn, cửa sổ desktop</td></tr>
+        <tr><td>Extra-large</td><td>≥ 1600dp</td><td>Màn hình desktop rộng</td></tr>
+      </tbody>
+    </table></div>
+    <p>Size class tính theo <strong>kích thước cửa sổ hiện tại</strong> của app, không theo loại thiết bị: điện thoại xoay ngang có thể là Medium, còn tablet chia đôi màn hình có thể chỉ là Compact. Chiều cao cũng có nhóm riêng, thường chỉ cần khi xử lý màn hình rất thấp (vd điện thoại xoay ngang).</p>
+
+    <h4>2. Lấy size class trong composable</h4>
+    <p class="code-caption">Thư viện cần thêm. Bộ <code>material3.adaptive</code> có phiên bản riêng, không nằm trong Compose BOM; 1.3.0 là bản ổn định mới nhất tính đến tháng 10/2026.</p>
+    <pre><code class="language-kotlin">dependencies {
+    implementation("androidx.compose.material3.adaptive:adaptive:1.3.0")
+    // Khi cần ListDetailPaneScaffold / SupportingPaneScaffold:
+    implementation("androidx.compose.material3.adaptive:adaptive-layout:1.3.0")
+}</code></pre>
+    <pre><code class="language-kotlin">import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.window.core.layout.WindowSizeClass
+
+@Composable
+fun AppContent() {
+    val windowSizeClass =
+        currentWindowAdaptiveInfo(supportLargeAndXLargeWidth = true).windowSizeClass
+
+    val isExpanded = windowSizeClass.isWidthAtLeastBreakpoint(
+        WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND
+    )
+    val isTallEnough = windowSizeClass.isHeightAtLeastBreakpoint(
+        WindowSizeClass.HEIGHT_DP_MEDIUM_LOWER_BOUND
+    )
+
+    if (isExpanded) TwoPaneLayout() else SinglePaneLayout()
+}</code></pre>
+    <p>Hàm trả về giá trị mới mỗi khi cửa sổ đổi kích thước (xoay, chia đôi màn hình, gập/mở máy), và composable tự recompose theo. Ngoài size class, <code>currentWindowAdaptiveInfo()</code> còn cho biết tư thế của máy gập qua <code>windowPosture</code>.</p>
+
+    <h4>3. Đừng dựa vào loại thiết bị hay hướng màn hình</h4>
+    <ul>
+      <li>Không viết kiểu "nếu là tablet thì…" hay "nếu đang nằm ngang thì…". Một tablet chia đôi màn hình chỉ còn cửa sổ hẹp; một máy gập mở ra lại rộng như tablet.</li>
+      <li>Quyết định bố cục ở cấp màn hình dựa trên size class, rồi truyền xuống dưới dạng tham số (vd <code>showTwoPanes: Boolean</code>) để composable con dễ preview và test.</li>
+    </ul>
+
+    <h4>4. <code>BoxWithConstraints</code> cho thành phần nhỏ</h4>
+    <p>Size class mô tả cả cửa sổ. Khi một thành phần cần tự thích ứng theo <em>chỗ được cấp cho nó</em> (vd một thẻ nằm trong cột hẹp), dùng <code>BoxWithConstraints</code> để đọc <code>maxWidth</code>:</p>
+    <pre><code class="language-kotlin">@Composable
+fun ProductHeader(name: String, price: String) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        if (maxWidth &lt; 400.dp) {
+            Column { ProductImage(); ProductInfo(name, price) }
+        } else {
+            Row { ProductImage(); ProductInfo(name, price) }
+        }
+    }
+}</code></pre>
+
+    <h4>5. Các bố cục chuẩn (canonical layouts)</h4>
+    <ul>
+      <li><strong>List-detail</strong>: danh sách bên trái, chi tiết bên phải (email, danh bạ, cài đặt). Thư viện <code>androidx.compose.material3.adaptive:adaptive-layout</code> có <code>ListDetailPaneScaffold</code>, tự quyết định hiện một hay hai ngăn và xử lý nút Back giữa các ngăn.</li>
+      <li><strong>Supporting pane</strong>: nội dung chính chiếm phần lớn, một ngăn phụ hiển thị thông tin bổ trợ (vd video và danh sách video liên quan).</li>
+      <li><strong>Feed</strong>: lưới nội dung đổi số cột theo bề rộng (tin tức, ảnh, sản phẩm), thường làm bằng <code>LazyVerticalGrid</code> (xem <a href="#lazy-grid">Lưới lười</a>).</li>
+    </ul>
+
+    <h4>6. Điều hướng thích ứng</h4>
+    <p><code>NavigationSuiteScaffold</code> (artifact <code>androidx.compose.material3:material3-adaptive-navigation-suite</code>) tự chọn thanh điều hướng dưới đáy khi cửa sổ hẹp và thanh bên (navigation rail) khi cửa sổ rộng hơn. Xem thêm <a href="#navigation-bar">Thanh điều hướng</a>.</p>
+    <pre><code class="language-kotlin">enum class Tab(val label: String, @DrawableRes val icon: Int) {
+    Home("Trang chủ", R.drawable.ic_home),
+    Contacts("Danh bạ", R.drawable.ic_contacts),
+    Settings("Cài đặt", R.drawable.ic_settings)
+}
+
+@Composable
+fun AdaptiveApp() {
+    var current by rememberSaveable { mutableStateOf(Tab.Home) }
+    NavigationSuiteScaffold(
+        navigationSuiteItems = {
+            Tab.entries.forEach { tab -&gt;
+                item(
+                    selected = tab == current,
+                    onClick = { current = tab },
+                    icon = { Icon(painterResource(tab.icon), contentDescription = null) },
+                    label = { Text(tab.label) }
+                )
+            }
+        }
+    ) {
+        when (current) {
+            Tab.Home -&gt; HomeScreen()
+            Tab.Contacts -&gt; ContactsScreen(sampleContacts)
+            Tab.Settings -&gt; SettingsScreen()
+        }
+    }
+}</code></pre>
+
+    <h4>7. Giữ state khi đổi kích thước và kiểm tra</h4>
+    <p>Xoay màn hình hay gập/mở máy thường khiến Activity được tạo lại. Lưu lựa chọn của người dùng bằng <code>rememberSaveable</code> hoặc ViewModel (xem <a href="#luu-trang-thai">Lưu trạng thái</a>, <a href="#viewmodel">ViewModel</a>) để không mất mục đang chọn. Để kiểm tra, dùng emulator <em>Resizable</em> của Android Studio (chuyển nhanh giữa điện thoại, máy gập, tablet, desktop) và chú thích <code>@PreviewScreenSizes</code> để xem nhiều kích thước cùng lúc trong preview (xem <a href="#preview">Preview</a>).</p>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+
+    <h4>Ví dụ 1: Danh bạ một cột trên điện thoại, hai ngăn trên màn rộng</h4>
+    <pre><code class="language-kotlin">data class Contact(val id: Long, val name: String, val phone: String, val email: String)
+
+@Composable
+fun ContactsScreen(contacts: List&lt;Contact&gt;) {
+    val windowSizeClass =
+        currentWindowAdaptiveInfo(supportLargeAndXLargeWidth = true).windowSizeClass
+    val showTwoPanes = windowSizeClass.isWidthAtLeastBreakpoint(
+        WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND
+    )
+    // Chỉ lưu id: còn nguyên khi xoay màn hình hoặc đổi kích thước cửa sổ
+    var selectedId by rememberSaveable { mutableStateOf&lt;Long?&gt;(null) }
+    val selected = contacts.firstOrNull { it.id == selectedId }
+
+    if (showTwoPanes) {
+        Row(Modifier.fillMaxSize()) {
+            ContactList(contacts, selectedId, { selectedId = it.id }, Modifier.width(360.dp))
+            VerticalDivider()
+            ContactDetail(selected, Modifier.weight(1f))
+        }
+    } else if (selected == null) {
+        ContactList(contacts, selectedId, { selectedId = it.id }, Modifier.fillMaxSize())
+    } else {
+        BackHandler { selectedId = null }   // nút Back quay về danh sách
+        ContactDetail(selected, Modifier.fillMaxSize())
+    }
+}
+
+@Composable
+fun ContactList(
+    contacts: List&lt;Contact&gt;,
+    selectedId: Long?,
+    onContactClick: (Contact) -&gt; Unit,
+    modifier: Modifier = Modifier
+) {
+    LazyColumn(modifier.fillMaxHeight()) {
+        items(contacts, key = { it.id }) { contact -&gt;
+            val isSelected = contact.id == selectedId
+            ListItem(
+                headlineContent = { Text(contact.name) },
+                supportingContent = { Text(contact.phone) },
+                colors = ListItemDefaults.colors(
+                    containerColor = if (isSelected) MaterialTheme.colorScheme.secondaryContainer
+                    else MaterialTheme.colorScheme.surface
+                ),
+                modifier = Modifier.clickable { onContactClick(contact) }
+            )
+        }
+    }
+}
+
+@Composable
+fun ContactDetail(contact: Contact?, modifier: Modifier = Modifier) {
+    Box(modifier.fillMaxHeight().padding(24.dp)) {
+        if (contact == null) {
+            Text("Chọn một liên hệ để xem chi tiết", Modifier.align(Alignment.Center))
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(contact.name, style = MaterialTheme.typography.headlineMedium)
+                Text("Điện thoại: ${contact.phone}")
+                Text("Email: ${contact.email}")
+            }
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Trên điện thoại, màn hình chỉ có danh sách; chạm vào "Nguyễn An" thì chi tiết chiếm toàn màn hình, bấm Back quay lại danh sách. Trên tablet nằm ngang, danh sách rộng 360dp ở bên trái, chi tiết ở bên phải, mục đang chọn được tô màu. Khi xoay máy hay mở máy gập, liên hệ đang chọn vẫn được giữ.</p>
+
+    <h4>Ví dụ 2: Lưới sản phẩm tự đổi số cột</h4>
+    <pre><code class="language-kotlin">data class Product(val id: Int, val name: String, val price: String)
+
+@Composable
+fun ProductGrid(products: List&lt;Product&gt;) {
+    LazyVerticalGrid(
+        // Mỗi cột rộng tối thiểu 160dp, số cột tự tính theo bề rộng
+        columns = GridCells.Adaptive(minSize = 160.dp),
+        contentPadding = PaddingValues(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxSize()
+    ) {
+        items(products, key = { it.id }) { product -&gt;
+            Card {
+                Column(Modifier.padding(12.dp)) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1f)
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(product.name, style = MaterialTheme.typography.titleSmall, maxLines = 2)
+                    Text(product.price, color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Không cần một dòng <code>if</code> nào: điện thoại rộng khoảng 411dp hiện 2 cột, tablet dọc khoảng 800dp hiện 4 cột, cửa sổ rộng 1280dp hiện 7 cột. Kéo giãn cửa sổ trên emulator Resizable, số cột đổi ngay lập tức.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li>Không khóa hướng màn hình hay tắt đổi kích thước trong manifest để né việc làm bố cục thích ứng: trên màn hình lớn, các phiên bản Android mới có thể bỏ qua những giới hạn đó.</li>
+      <li>Rẽ nhánh theo size class, không theo tên thiết bị hay <code>orientation</code>. Đặt việc rẽ nhánh ở cấp màn hình, composable con nhận tham số.</li>
+      <li>Trên màn rộng, đừng kéo dãn chữ và ô nhập hết chiều ngang; giới hạn bằng <code>Modifier.widthIn(max = 600.dp)</code> cho dễ đọc.</li>
+      <li><code>BoxWithConstraints</code> dùng cơ chế subcomposition nên tốn hơn layout thường; chỉ dùng khi nội dung thật sự phụ thuộc kích thước được cấp.</li>
+      <li>Lưu state quan trọng bằng <code>rememberSaveable</code> hoặc ViewModel; state chỉ dùng <code>remember</code> sẽ mất khi Activity được tạo lại.</li>
+      <li>Màn hình lớn thường đi kèm bàn phím và chuột: đảm bảo phím Tab, phím mũi tên, hover và chuột phải hoạt động hợp lý.</li>
+    </ul>
+    <div class="callout tip"><strong>Mẹo:</strong> Khi app có nhiều màn kiểu danh sách và chi tiết, hãy thử <code>ListDetailPaneScaffold</code> thay vì tự viết như Ví dụ 1. Nó xử lý sẵn số ngăn, animation chuyển ngăn và nút Back.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/layouts/adaptive?hl=vi" target="_blank" rel="noopener">Xây dựng bố cục thích ứng</a></p>
+</section>

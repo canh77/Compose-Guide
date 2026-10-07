@@ -1,0 +1,238 @@
+<section class="topic" id="modifier" data-title="Modifier">
+  <h2>Modifier</h2>
+  <p class="lead">Modifier là cách Compose "trang trí" và điều chỉnh một composable: kích thước, khoảng đệm, màu nền, viền, khả năng bấm, cuộn… Gần như mọi composable đều nhận tham số <code>modifier</code>, nên hiểu Modifier là kỹ năng dùng hằng ngày.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p><code>Modifier</code> là một chuỗi có thứ tự gồm các phần tử, mỗi phần tử bổ sung một hành vi cho composable mà nó gắn vào. Một modifier có thể:</p>
+    <ul>
+      <li>thay đổi <strong>kích thước và bố cục</strong> (<code>size</code>, <code>padding</code>, <code>fillMaxWidth</code>…);</li>
+      <li>thay đổi <strong>cách vẽ</strong> (<code>background</code>, <code>border</code>, <code>clip</code>, <code>alpha</code>…);</li>
+      <li>thêm <strong>tương tác</strong> (<code>clickable</code>, <code>verticalScroll</code>, cử chỉ kéo thả…);</li>
+      <li>bổ sung <strong>thông tin</strong> cho trợ năng và kiểm thử (<code>semantics</code>, <code>testTag</code>).</li>
+    </ul>
+    <p>Trong hệ thống View cũ, các việc này nằm rải rác: <code>android:padding</code> và <code>android:background</code> trong XML, <code>setOnClickListener</code> trong code, mỗi loại View lại có thuộc tính riêng. Compose gom tất cả về một kiểu duy nhất và áp dụng được cho <em>bất kỳ</em> composable nào. Modifier là đối tượng bất biến (immutable): mỗi lần gọi <code>.padding(...)</code> sẽ trả về một Modifier mới nối thêm phần tử, không sửa Modifier cũ.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>Tạo chuỗi modifier</h4>
+    <p>Bắt đầu từ đối tượng <code>Modifier</code> (chữ M hoa) rồi nối các hàm bằng dấu chấm:</p>
+    <pre><code class="language-kotlin">Text(
+    text = "Xin chào",
+    modifier = Modifier
+        .fillMaxWidth()
+        .background(Color(0xFFFFF3E0))
+        .padding(16.dp)
+)</code></pre>
+
+    <h4>Thứ tự là quan trọng</h4>
+    <p>Hãy đọc chuỗi modifier từ trái sang phải như các lớp vỏ bọc từ ngoài vào trong: mỗi modifier bọc lấy tất cả những gì đứng sau nó. Đổi thứ tự là đổi kết quả.</p>
+    <ul>
+      <li><code>.background(Color.Yellow).padding(16.dp)</code>: nền vàng phủ cả vùng đệm, chữ cách mép nền 16dp. Giống <code>padding</code> trong View.</li>
+      <li><code>.padding(16.dp).background(Color.Yellow)</code>: lề 16dp nằm <em>ngoài</em> nền, nền chỉ ôm sát chữ. Giống <code>margin</code> trong View. Compose không có modifier <code>margin</code> riêng, bạn tạo lề bằng cách đặt <code>padding</code> trước.</li>
+      <li><code>.clickable { }.padding(16.dp)</code>: toàn bộ vùng, kể cả phần đệm, đều bấm được và hiệu ứng gợn sóng (ripple) phủ hết. Đây thường là điều bạn muốn.</li>
+      <li><code>.padding(16.dp).clickable { }</code>: phần đệm 16dp nằm ngoài vùng bấm, người dùng chạm vào mép sẽ không có phản hồi.</li>
+      <li><code>.size(100.dp).padding(10.dp)</code>: tổng cộng 100dp, nội dung còn 80dp. Ngược lại <code>.padding(10.dp).size(100.dp)</code> cho tổng cộng 120dp.</li>
+    </ul>
+
+    <h4>Các modifier phổ biến</h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Modifier</th><th>Tác dụng</th></tr></thead>
+      <tbody>
+        <tr><td><code>size(48.dp)</code>, <code>size(120.dp, 40.dp)</code></td><td>Đặt chiều rộng và chiều cao mong muốn.</td></tr>
+        <tr><td><code>width(120.dp)</code>, <code>height(40.dp)</code></td><td>Chỉ đặt một chiều, chiều kia tự co theo nội dung.</td></tr>
+        <tr><td><code>fillMaxWidth()</code>, <code>fillMaxHeight()</code>, <code>fillMaxSize(0.5f)</code></td><td>Chiếm toàn bộ (hoặc một phần theo tỉ lệ) không gian cha cho phép.</td></tr>
+        <tr><td><code>padding(16.dp)</code>, <code>padding(horizontal = 16.dp, vertical = 8.dp)</code></td><td>Thêm khoảng đệm quanh nội dung; có thể chỉ định từng cạnh <code>start</code>, <code>top</code>, <code>end</code>, <code>bottom</code>.</td></tr>
+        <tr><td><code>background(color, shape)</code></td><td>Vẽ nền, có thể theo hình dạng (ví dụ <code>RoundedCornerShape(8.dp)</code>).</td></tr>
+        <tr><td><code>border(1.dp, Color.Gray, shape)</code></td><td>Vẽ viền.</td></tr>
+        <tr><td><code>clip(CircleShape)</code></td><td>Cắt mọi thứ vẽ phía sau theo hình dạng (bo tròn ảnh, avatar…).</td></tr>
+        <tr><td><code>clickable { }</code></td><td>Cho phép bấm, kèm hiệu ứng ripple và thông tin trợ năng.</td></tr>
+        <tr><td><code>offset(x = 4.dp, y = 0.dp)</code></td><td>Dịch vị trí vẽ; không làm thay đổi kích thước hay đẩy các phần tử bên cạnh.</td></tr>
+        <tr><td><code>alpha(0.5f)</code></td><td>Độ trong suốt từ 0 (ẩn) đến 1 (rõ hoàn toàn).</td></tr>
+        <tr><td><code>rotate(45f)</code>, <code>scale(1.2f)</code></td><td>Xoay (độ) và phóng to/thu nhỏ khi vẽ.</td></tr>
+        <tr><td><code>shadow(8.dp, shape)</code></td><td>Đổ bóng theo độ cao (elevation).</td></tr>
+        <tr><td><code>verticalScroll(rememberScrollState())</code></td><td>Cho nội dung cuộn dọc (có <code>horizontalScroll</code> cho chiều ngang).</td></tr>
+        <tr><td><code>testTag("login_button")</code></td><td>Gắn nhãn để tìm phần tử trong <a href="#testing">kiểm thử</a>.</td></tr>
+        <tr><td><code>semantics { contentDescription = "…" }</code></td><td>Bổ sung thông tin cho trình đọc màn hình (xem <a href="#accessibility">Trợ năng</a>).</td></tr>
+      </tbody>
+    </table></div>
+
+    <h4>Modifier chỉ có trong scope</h4>
+    <p>Một số modifier chỉ gọi được bên trong layout cha tương ứng: <code>weight</code> (trong Row/Column), <code>align</code> (trong Row/Column/Box), <code>matchParentSize</code> (trong Box). Compose dùng cơ chế scope của Kotlin để chặn việc dùng sai ngay khi biên dịch. Chi tiết ở <a href="#column-row-box">Column, Row và Box</a>.</p>
+
+    <h4>Quy ước tham số <code>modifier</code></h4>
+    <p>Mọi composable phát ra giao diện mà bạn viết nên có tham số <code>modifier: Modifier = Modifier</code>, đặt là tham số tùy chọn đầu tiên, và áp dụng nó cho <strong>phần tử gốc</strong> (phần tử ngoài cùng) ở <strong>đầu</strong> chuỗi:</p>
+    <pre><code class="language-kotlin">@Composable
+fun PriceTag(price: String, modifier: Modifier = Modifier) {
+    Text(
+        text = price,
+        modifier = modifier          // modifier của người gọi đứng đầu
+            .background(Color(0xFFE8F5E9), RoundedCornerShape(4.dp))
+            .padding(horizontal = 8.dp, vertical = 2.dp)
+    )
+}</code></pre>
+    <p>Nhờ vậy người gọi có thể thêm <code>padding</code>, <code>weight</code>, <code>align</code>… từ bên ngoài mà không phải sửa hàm.</p>
+
+    <h4>Tái sử dụng và modifier có điều kiện</h4>
+    <p>Chuỗi modifier dùng lặp lại có thể tách thành biến. Đặt ngoài composable giúp không phải tạo lại mỗi lần recompose (vẽ lại khi dữ liệu thay đổi):</p>
+    <pre><code class="language-kotlin">private val sectionTitleModifier = Modifier
+    .fillMaxWidth()
+    .padding(horizontal = 16.dp, vertical = 8.dp)</code></pre>
+    <p>Khi cần thêm modifier tùy theo điều kiện mà không làm gãy chuỗi, dùng <code>then</code>; nhánh "không làm gì" trả về <code>Modifier</code> rỗng:</p>
+    <pre><code class="language-kotlin">Modifier
+    .fillMaxWidth()
+    .then(if (isError) Modifier.border(1.dp, Color.Red) else Modifier)
+    .padding(12.dp)</code></pre>
+
+    <h4>Tự viết modifier</h4>
+    <p>Cách đơn giản nhất là viết <strong>hàm mở rộng</strong> (extension function) nối các modifier có sẵn:</p>
+    <pre><code class="language-kotlin">fun Modifier.roundedSurface(color: Color, radius: Dp = 16.dp): Modifier =
+    this
+        .clip(RoundedCornerShape(radius))
+        .background(color)</code></pre>
+    <p>Với hành vi phức tạp hơn (tự vẽ, tự đo, giữ trạng thái riêng), Compose dùng API <code>Modifier.Node</code>: bạn viết một lớp <code>Modifier.Node</code> chứa logic và một lớp <code>ModifierNodeElement</code> để tạo/cập nhật node đó. API cũ <code>Modifier.composed</code> không còn được khuyến nghị vì chậm hơn. Người mới chỉ cần biết <code>Modifier.Node</code> tồn tại; phần lớn nhu cầu thực tế được đáp ứng bằng hàm mở rộng ở trên.</p>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>1. Thấy tận mắt ảnh hưởng của thứ tự</h4>
+    <pre><code class="language-kotlin">@Preview(showBackground = true)
+@Composable
+fun ModifierOrderDemo() {
+    Row(
+        modifier = Modifier.padding(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Nền trước, padding sau: nền phủ cả phần đệm
+        Text(
+            text = "Nền ngoài",
+            modifier = Modifier
+                .background(Color(0xFFFFE082))
+                .padding(16.dp)
+        )
+        // Padding trước, nền sau: phần đệm thành lề trong suốt
+        Text(
+            text = "Nền trong",
+            modifier = Modifier
+                .border(1.dp, Color.Gray)
+                .padding(16.dp)
+                .background(Color(0xFFFFE082))
+        )
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Ô bên trái là một khối vàng lớn có chữ ở giữa. Ô bên phải có viền xám bên ngoài, nhưng màu vàng chỉ ôm sát chữ, giữa viền và nền vàng là khoảng trắng 16dp.</p>
+
+    <h4>2. Mục cài đặt có vùng bấm rộng</h4>
+    <pre><code class="language-kotlin">@Composable
+fun SettingItem(
+    title: String,
+    onClick: () -&gt; Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)   // bấm được cả phần đệm
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = title, modifier = Modifier.weight(1f))
+        Icon(
+            painter = painterResource(R.drawable.ic_chevron_right),
+            contentDescription = null
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun SettingListPreview() {
+    Column {
+        SettingItem(title = "Thông báo", onClick = {})
+        HorizontalDivider()
+        SettingItem(title = "Quyền riêng tư", onClick = {})
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Hai dòng cài đặt ngăn bởi một đường kẻ mảnh. Chạm vào bất kỳ đâu trên dòng, kể cả sát mép, đều thấy hiệu ứng gợn sóng phủ kín cả dòng. Nếu chuyển <code>.clickable</code> xuống sau <code>.padding</code>, ripple sẽ thu nhỏ và chạm vào mép dòng không còn tác dụng.</p>
+
+    <h4>3. Thẻ ghi chú: hàm mở rộng, then và modifier của người gọi</h4>
+    <pre><code class="language-kotlin">fun Modifier.roundedSurface(color: Color, radius: Dp = 16.dp): Modifier =
+    this
+        .clip(RoundedCornerShape(radius))
+        .background(color)
+
+@Composable
+fun NoteCard(
+    title: String,
+    preview: String,
+    selected: Boolean,
+    onClick: () -&gt; Unit,
+    modifier: Modifier = Modifier
+) {
+    val shape = RoundedCornerShape(16.dp)
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .then(
+                if (selected) {
+                    Modifier.border(2.dp, MaterialTheme.colorScheme.primary, shape)
+                } else {
+                    Modifier
+                }
+            )
+            .roundedSurface(MaterialTheme.colorScheme.surfaceVariant)
+            .selectable(selected = selected, onClick = onClick)
+            .padding(16.dp)
+    ) {
+        Text(text = title, style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = preview,
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun NoteCardPreview() {
+    var selectedId by remember { mutableIntStateOf(1) }
+    Column(
+        modifier = Modifier.padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        NoteCard(
+            title = "Đi chợ",
+            preview = "Rau cải, trứng, sữa tươi, cà chua",
+            selected = selectedId == 1,
+            onClick = { selectedId = 1 }
+        )
+        NoteCard(
+            title = "Ý tưởng cuối tuần",
+            preview = "Đi dạo hồ Tây, ghé hiệu sách cũ rồi ăn bún chả",
+            selected = selectedId == 2,
+            onClick = { selectedId = 2 }
+        )
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Hai thẻ bo góc nền xám nhạt. Thẻ đang chọn có viền màu chủ đạo dày 2dp; chạm vào thẻ còn lại thì viền chuyển sang thẻ đó. <code>selectable</code> hoạt động như <code>clickable</code> nhưng còn báo trạng thái "đã chọn" cho trình đọc màn hình.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li><strong>Áp <code>modifier</code> đúng một lần, ở phần tử gốc.</strong> Lỗi hay gặp là bắt đầu chuỗi bên trong bằng <code>Modifier</code> thay vì <code>modifier</code>, khiến mọi thứ người gọi truyền vào bị bỏ qua; hoặc truyền cùng một <code>modifier</code> cho nhiều phần tử con.</li>
+      <li><strong>Đặt <code>clip</code> trước <code>clickable</code></strong> để hiệu ứng ripple bo theo đúng hình dạng; đặt <code>clickable</code> trước <code>padding</code> để vùng bấm đủ rộng.</li>
+      <li><strong>Vùng chạm tối thiểu 48dp.</strong> Các component Material như <code>IconButton</code> tự đảm bảo điều này, còn phần tử tự làm bằng <code>clickable</code> thì bạn phải tự tính kích thước.</li>
+      <li><strong><code>offset</code> khác <code>padding</code>.</strong> <code>offset</code> chỉ dịch hình vẽ, phần tử bên cạnh không bị đẩy đi nên có thể đè lên nhau.</li>
+      <li><strong>Giá trị thay đổi liên tục (animation, vị trí cuộn)</strong> nên truyền qua phiên bản lambda như <code>offset { IntOffset(x, 0) }</code> hoặc <code>graphicsLayer { alpha = a }</code> để tránh recompose mỗi khung hình. Xem thêm ở <a href="#performance">Hiệu năng</a>.</li>
+      <li><strong>Không đọc <code>MaterialTheme</code> trong hàm mở rộng thường.</strong> Hàm mở rộng Modifier không phải <code>@Composable</code>, hãy nhận màu qua tham số như <code>roundedSurface(color)</code>.</li>
+    </ul>
+    <div class="callout info"><strong>Lưu ý:</strong> Khi gặp tài liệu hoặc thư viện cũ dùng <code>Modifier.composed { }</code>, hãy hiểu đó là cách cũ. Code mới nên dùng hàm mở rộng nối chuỗi, hoặc <code>Modifier.Node</code> khi thật sự cần hành vi tùy biến.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/modifiers" target="_blank" rel="noopener">Compose modifiers</a></p>
+</section>

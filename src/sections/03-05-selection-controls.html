@@ -1,0 +1,288 @@
+<section class="topic" id="selection-controls" data-title="Checkbox, Switch, Slider">
+  <h2>Checkbox, Switch, RadioButton và Slider</h2>
+  <p class="lead">Các control chọn cho phép người dùng bật/tắt một tùy chọn, chọn một phương án trong nhóm hoặc kéo để chọn một giá trị số. Chúng là "nguyên liệu" chính của màn hình cài đặt, biểu mẫu và danh sách việc cần làm.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p>Material 3 trong Compose cung cấp bốn nhóm control chọn: <code>Checkbox</code> (ô đánh dấu, chọn nhiều mục độc lập), <code>Switch</code> (công tắc bật/tắt), <code>RadioButton</code> (nút chọn đúng một phương án trong nhóm) và <code>Slider</code> (thanh trượt chọn giá trị trong một khoảng). Đi kèm còn có <code>TriStateCheckbox</code> — ô đánh dấu ba trạng thái dùng cho ô "Chọn tất cả" — và <code>RangeSlider</code> để chọn một khoảng từ–đến.</p>
+    <p>Điều quan trọng nhất cần nhớ: tất cả các control này đều <strong>stateless</strong> (không tự giữ trạng thái). Chúng chỉ nhận giá trị hiện tại (<code>checked</code>, <code>selected</code>, <code>value</code>) và một callback báo rằng "người dùng muốn đổi giá trị". Cập nhật state là việc của bạn. Ở hệ View cũ, <code>CheckBox</code> tự đổi dấu tích khi bấm rồi bạn mới lắng nghe để đồng bộ dữ liệu; trong Compose thì ngược lại — nếu bạn không cập nhật state, control đứng yên như chưa từng được bấm.</p>
+    <p>Cách thiết kế này đảm bảo giao diện luôn là bản phản chiếu của dữ liệu: chỉ có một nguồn sự thật (single source of truth), dễ đưa lên <a href="#viewmodel">ViewModel</a>, dễ kiểm thử và không bao giờ có chuyện UI hiện "đã bật" trong khi dữ liệu là "tắt". Xem thêm <a href="#state-remember">State và remember</a> và <a href="#state-hoisting">State hoisting</a>.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+
+    <h4>1. Checkbox và TriStateCheckbox</h4>
+    <p>Truyền giá trị vào <code>checked</code> và cập nhật state trong <code>onCheckedChange</code>:</p>
+    <pre><code class="language-kotlin">var agreed by remember { mutableStateOf(false) }
+
+Checkbox(
+    checked = agreed,
+    onCheckedChange = { agreed = it }
+)</code></pre>
+    <p><code>TriStateCheckbox</code> nhận <code>state: ToggleableState</code> với ba giá trị <code>On</code> (tích), <code>Off</code> (trống) và <code>Indeterminate</code> (gạch ngang, nghĩa là "chỉ một phần được chọn"). Thay cho <code>onCheckedChange</code>, nó có <code>onClick</code>: bạn tự quyết định trạng thái tiếp theo khi người dùng bấm.</p>
+
+    <h4>2. Switch</h4>
+    <p><code>Switch</code> có chữ ký giống Checkbox. Tham số <code>thumbContent</code> cho phép vẽ một icon nhỏ bên trong núm gạt, ví dụ dấu tích khi đang bật:</p>
+    <pre><code class="language-kotlin">var wifiOn by remember { mutableStateOf(true) }
+
+Switch(
+    checked = wifiOn,
+    onCheckedChange = { wifiOn = it },
+    thumbContent = if (wifiOn) {
+        {
+            Icon(
+                painter = painterResource(R.drawable.ic_check),
+                contentDescription = null,
+                modifier = Modifier.size(SwitchDefaults.IconSize)
+            )
+        }
+    } else {
+        null
+    }
+)</code></pre>
+
+    <h4>3. Nhóm RadioButton</h4>
+    <p>Compose không có "RadioGroup" như XML. <code>RadioButton</code> chỉ có <code>selected</code> và <code>onClick</code>; bạn tự lưu phương án đang chọn rồi vẽ từng nút bằng vòng lặp. Hai modifier giúp nhóm hoạt động đúng:</p>
+    <ul>
+      <li><code>Modifier.selectableGroup()</code> đặt trên container (<code>Column</code>/<code>Row</code>) chứa các nút, để trình đọc màn hình hiểu đây là một nhóm chọn-một.</li>
+      <li><code>Modifier.selectable(selected, onClick, role = Role.RadioButton)</code> đặt trên mỗi hàng, để bấm vào chữ cũng chọn được. Khi đó truyền <code>onClick = null</code> cho <code>RadioButton</code> bên trong.</li>
+    </ul>
+
+    <h4>4. Cả hàng bấm được cho Checkbox và Switch</h4>
+    <p>Khi Checkbox/Switch đi kèm một nhãn chữ, hãy gắn <code>Modifier.toggleable(value, role = Role.Checkbox, onValueChange)</code> (hoặc <code>Role.Switch</code>) lên cả hàng và đặt <code>onCheckedChange = null</code> cho control con. Lý do:</p>
+    <ul>
+      <li><strong>Vùng chạm lớn:</strong> bấm vào chữ cũng được, không phải nhắm đúng ô vuông nhỏ xíu.</li>
+      <li><strong>Hỗ trợ tiếp cận:</strong> TalkBack đọc cả hàng như một phần tử duy nhất, ví dụ "Nhận thông báo, công tắc, đang bật", thay vì hai điểm dừng rời rạc (một cho chữ, một cho ô). Xem <a href="#accessibility">Hỗ trợ tiếp cận</a>.</li>
+      <li><strong>Một nơi xử lý duy nhất:</strong> khi control con có <code>null</code>, nó chỉ còn là phần hiển thị; mọi thao tác đi qua hàng cha.</li>
+    </ul>
+    <p>Với <code>TriStateCheckbox</code>, modifier tương ứng là <code>Modifier.triStateToggleable(state, role = Role.Checkbox, onClick)</code>.</p>
+    <p class="code-caption">Các import không hiển nhiên cho phần này:</p>
+    <pre><code class="language-kotlin">import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.selection.triStateToggleable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.state.ToggleableState</code></pre>
+
+    <h4>5. Slider và RangeSlider</h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Tham số</th><th>Ý nghĩa</th></tr></thead>
+      <tbody>
+        <tr><td><code>value</code></td><td>Giá trị hiện tại, kiểu <code>Float</code>.</td></tr>
+        <tr><td><code>onValueChange</code></td><td>Được gọi liên tục trong lúc kéo, mỗi lần nhận giá trị mới.</td></tr>
+        <tr><td><code>valueRange</code></td><td>Khoảng giá trị, mặc định <code>0f..1f</code>. Ví dụ <code>12f..24f</code>.</td></tr>
+        <tr><td><code>steps</code></td><td>Số mốc dừng <em>nằm giữa</em> hai đầu (không tính hai đầu). <code>0</code> = trượt liên tục.</td></tr>
+        <tr><td><code>onValueChangeFinished</code></td><td>Gọi một lần khi người dùng thả tay — nơi phù hợp để lưu giá trị.</td></tr>
+        <tr><td><code>enabled</code></td><td><code>false</code> thì làm mờ và không cho kéo.</td></tr>
+      </tbody>
+    </table></div>
+    <p>Công thức cho <code>steps</code>: muốn có N mức có thể chọn thì <code>steps = N - 2</code>. Ví dụ cỡ chữ 12, 14, 16, …, 24 là 7 mức nên <code>steps = 5</code>.</p>
+    <p><code>RangeSlider</code> có hai núm; <code>value</code> là một khoảng kiểu <code>ClosedFloatingPointRange&lt;Float&gt;</code>:</p>
+    <pre><code class="language-kotlin">var priceRange by remember { mutableStateOf(200f..600f) }
+
+RangeSlider(
+    value = priceRange,
+    onValueChange = { priceRange = it },
+    valueRange = 0f..1000f,
+    steps = 9 // 11 mức: 0, 100, 200, ..., 1000
+)
+Text("Giá từ ${priceRange.start.toInt()}k đến ${priceRange.endInclusive.toInt()}k")</code></pre>
+
+    <h4>6. Khi nào dùng control nào?</h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Control</th><th>Dùng khi</th><th>Ví dụ</th></tr></thead>
+      <tbody>
+        <tr><td><code>Checkbox</code></td><td>Chọn nhiều mục độc lập, hoặc xác nhận một điều kiện; thường đi kèm nút "Lưu"/"Gửi".</td><td>Đồng ý điều khoản, đánh dấu việc đã làm</td></tr>
+        <tr><td><code>TriStateCheckbox</code></td><td>Một mục cha đại diện cho cả nhóm checkbox con.</td><td>"Chọn tất cả" email</td></tr>
+        <tr><td><code>Switch</code></td><td>Bật/tắt một cài đặt có hiệu lực ngay lập tức.</td><td>Wi-Fi, thông báo, chế độ tiết kiệm pin</td></tr>
+        <tr><td><code>RadioButton</code></td><td>Chọn đúng một trong khoảng 2–5 phương án và muốn người dùng thấy hết các phương án.</td><td>Giao diện Sáng/Tối/Theo hệ thống</td></tr>
+        <tr><td><code>Slider</code></td><td>Chọn giá trị số trong khoảng, không cần gõ con số chính xác.</td><td>Âm lượng, độ sáng, cỡ chữ</td></tr>
+        <tr><td><code>RangeSlider</code></td><td>Chọn một khoảng tối thiểu–tối đa.</td><td>Lọc giá sản phẩm</td></tr>
+      </tbody>
+    </table></div>
+    <p>Nếu có nhiều phương án hơn (ví dụ chọn 1 trong 20 tỉnh), dùng menu thả xuống thay vì RadioButton — xem <a href="#dialog-sheet-menu">Dialog, Bottom sheet và Menu</a>.</p>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+
+    <h4>Ví dụ 1: Màn hình cài đặt</h4>
+    <p class="code-caption">Switch bật thông báo, nhóm Radio chọn giao diện và Slider chỉnh cỡ chữ có xem trước.</p>
+    <pre><code class="language-kotlin">import kotlin.math.roundToInt
+
+enum class ThemeOption(val label: String) {
+    LIGHT("Sáng"), DARK("Tối"), SYSTEM("Theo hệ thống")
+}
+
+@Composable
+fun SettingsScreen() {
+    var notificationsOn by remember { mutableStateOf(true) }
+    var theme by remember { mutableStateOf(ThemeOption.SYSTEM) }
+    var fontSize by remember { mutableFloatStateOf(16f) }
+
+    Column(Modifier.fillMaxSize().padding(vertical = 16.dp)) {
+        // Switch: cả hàng là một công tắc
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .toggleable(
+                    value = notificationsOn,
+                    role = Role.Switch,
+                    onValueChange = { notificationsOn = it }
+                )
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Nhận thông báo", modifier = Modifier.weight(1f))
+            Switch(checked = notificationsOn, onCheckedChange = null)
+        }
+
+        HorizontalDivider()
+
+        // RadioButton: một nhóm, mỗi hàng chọn được
+        Text(
+            "Giao diện",
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp)
+        )
+        Column(Modifier.selectableGroup()) {
+            ThemeOption.entries.forEach { option -&gt;
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .selectable(
+                            selected = theme == option,
+                            onClick = { theme = option },
+                            role = Role.RadioButton
+                        )
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(selected = theme == option, onClick = null)
+                    Text(option.label, modifier = Modifier.padding(start = 16.dp))
+                }
+            }
+        }
+
+        HorizontalDivider()
+
+        // Slider: 12..24 sp, bước 2 =&gt; 7 mức =&gt; steps = 5
+        Text(
+            "Cỡ chữ: ${fontSize.roundToInt()} sp",
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(start = 16.dp, top = 16.dp)
+        )
+        Slider(
+            value = fontSize,
+            onValueChange = { fontSize = it },
+            valueRange = 12f..24f,
+            steps = 5,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+        Text(
+            "Xem trước: Hôm nay trời Đà Lạt se lạnh.",
+            fontSize = fontSize.sp,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun SettingsScreenPreview() {
+    MaterialTheme { SettingsScreen() }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Màn hình có ba phần ngăn cách bằng đường kẻ: hàng "Nhận thông báo" với công tắc bên phải; nhóm ba lựa chọn Sáng/Tối/Theo hệ thống (luôn chỉ một nút được chọn); thanh trượt cỡ chữ dừng đúng ở 12, 14, …, 24 và dòng xem trước to/nhỏ theo khi kéo.</p>
+
+    <h4>Ví dụ 2: Danh sách việc cần làm có "Chọn tất cả"</h4>
+    <pre><code class="language-kotlin">data class TodoItem(val id: Int, val title: String, val done: Boolean = false)
+
+@Composable
+fun TodoChecklist() {
+    var todos by remember {
+        mutableStateOf(
+            listOf(
+                TodoItem(1, "Mua rau và trứng"),
+                TodoItem(2, "Trả sách thư viện"),
+                TodoItem(3, "Tập thể dục 30 phút", done = true)
+            )
+        )
+    }
+
+    // Trạng thái ô cha được TÍNH từ các ô con, không lưu riêng
+    val parentState = when {
+        todos.all { it.done } -&gt; ToggleableState.On
+        todos.none { it.done } -&gt; ToggleableState.Off
+        else -&gt; ToggleableState.Indeterminate
+    }
+
+    Column(Modifier.padding(vertical = 8.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .triStateToggleable(
+                    state = parentState,
+                    role = Role.Checkbox,
+                    onClick = {
+                        val markAll = parentState != ToggleableState.On
+                        todos = todos.map { it.copy(done = markAll) }
+                    }
+                )
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TriStateCheckbox(state = parentState, onClick = null)
+            Text(
+                "Chọn tất cả (${todos.count { it.done }}/${todos.size})",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(start = 16.dp)
+            )
+        }
+
+        HorizontalDivider()
+
+        todos.forEach { todo -&gt;
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(
+                        value = todo.done,
+                        role = Role.Checkbox,
+                        onValueChange = { checked -&gt;
+                            todos = todos.map {
+                                if (it.id == todo.id) it.copy(done = checked) else it
+                            }
+                        }
+                    )
+                    .padding(start = 32.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(checked = todo.done, onCheckedChange = null)
+                Text(
+                    todo.title,
+                    modifier = Modifier.padding(start = 16.dp),
+                    textDecoration = if (todo.done) TextDecoration.LineThrough else null
+                )
+            }
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Ô "Chọn tất cả (1/3)" ban đầu hiện dấu gạch ngang vì chỉ một việc đã xong. Bấm vào nó thì cả ba việc được tích và bị gạch chữ; bấm lần nữa thì bỏ tích hết. Tích từng việc con thì ô cha tự chuyển giữa trống, gạch ngang và tích.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li><strong>Bấm mà không thấy gì thay đổi?</strong> Gần như chắc chắn bạn quên cập nhật state trong callback, hoặc truyền một giá trị cố định như <code>checked = true</code>. Control chỉ hiển thị đúng thứ bạn đưa vào.</li>
+      <li><strong>Đừng để cả hàng lẫn control con cùng xử lý chạm.</strong> Khi hàng đã có <code>toggleable</code>/<code>selectable</code>, hãy đặt <code>onCheckedChange = null</code> (hoặc <code>onClick = null</code>) cho control con; nếu không, TalkBack sẽ thấy hai phần tử bấm được chồng lên nhau.</li>
+      <li><strong>Slider gọi <code>onValueChange</code> rất dày</strong> (mỗi khung hình khi kéo). Đừng ghi cơ sở dữ liệu hay gọi mạng ở đó; chỉ cập nhật state hiển thị, còn việc lưu thì làm trong <code>onValueChangeFinished</code>.</li>
+      <li>Giá trị Slider là <code>Float</code>: viết <code>16f</code>, <code>12f..24f</code> chứ không phải <code>16</code>, <code>12..24</code>. Khi hiển thị, dùng <code>roundToInt()</code> thay vì <code>toInt()</code> để tránh 15,9999 bị cắt thành 15.</li>
+      <li><strong>Switch nghĩa là "có hiệu lực ngay".</strong> Nếu thay đổi chỉ áp dụng sau khi bấm "Lưu", dùng Checkbox sẽ đúng quy ước hơn.</li>
+      <li>State tạo bằng <code>remember</code> sẽ mất khi xoay màn hình; với lựa chọn của người dùng, dùng <code>rememberSaveable</code> hoặc đưa lên ViewModel — xem <a href="#luu-trang-thai">Lưu trạng thái</a>.</li>
+      <li>Muốn đổi màu, dùng <code>CheckboxDefaults.colors(...)</code>, <code>SwitchDefaults.colors(...)</code>, <code>SliderDefaults.colors(...)</code>; nhưng ưu tiên chỉnh <code>colorScheme</code> của theme để mọi control đồng bộ — xem <a href="#custom-theme">Tùy biến theme</a>.</li>
+    </ul>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/components/checkbox" target="_blank" rel="noopener">Checkbox</a>, <a href="https://developer.android.com/develop/ui/compose/components/slider" target="_blank" rel="noopener">Slider</a></p>
+</section>

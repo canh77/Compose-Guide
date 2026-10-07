@@ -1,0 +1,187 @@
+<section class="topic" id="kich-thuoc-rang-buoc" data-title="Kích thước &amp; ràng buộc">
+  <h2>Kích thước và ràng buộc (constraints)</h2>
+  <p class="lead">Vì sao <code>size(200.dp)</code> đôi khi không ra 200dp? Câu trả lời nằm ở cách Compose đo đạc: cha đặt giới hạn, con chọn kích thước trong giới hạn đó. Hiểu mô hình này giúp bạn hết "đoán mò" khi bố cục không như ý.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p>Mỗi phần tử trong cây giao diện được bố trí qua ba bước: <strong>đo các con</strong> → <strong>tự quyết định kích thước của mình</strong> → <strong>đặt vị trí các con</strong>. Thông tin cha truyền xuống cho con khi đo gọi là <strong>constraints</strong> (ràng buộc), gồm bốn giá trị: chiều rộng tối thiểu/tối đa và chiều cao tối thiểu/tối đa. Con bắt buộc phải chọn kích thước nằm trong khoảng đó, rồi báo lại cho cha.</p>
+    <p>Compose áp dụng quy tắc <strong>đo một lượt</strong> (single-pass measurement): trong một lần bố cục, mỗi phần tử con chỉ được đo đúng một lần. Ở hệ thống View, <code>onMeasure</code> có thể bị gọi nhiều lần (ví dụ <code>LinearLayout</code> có <code>layout_weight</code> lồng nhau, hay <code>RelativeLayout</code>), khiến chi phí tăng theo cấp số nhân khi lồng sâu. Compose tránh được điều này, nên lồng layout không còn là nỗi lo lớn.</p>
+    <p>Có ba dạng ràng buộc hay gặp:</p>
+    <ul>
+      <li><strong>Có giới hạn</strong> (bounded): có giá trị tối đa cụ thể, ví dụ chiều rộng màn hình.</li>
+      <li><strong>Không giới hạn</strong> (unbounded): tối đa là vô cực, ví dụ chiều dọc bên trong một vùng <code>verticalScroll</code>.</li>
+      <li><strong>Chính xác</strong> (exact): tối thiểu bằng tối đa, con không có lựa chọn nào khác, ví dụ sau <code>fillMaxWidth()</code>.</li>
+    </ul>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>Modifier ảnh hưởng tới ràng buộc</h4>
+    <p>Mỗi modifier kích thước trong chuỗi sẽ nhận ràng buộc từ phía trước (bên trái), biến đổi nó rồi chuyển tiếp cho phần phía sau (bên phải).</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Modifier</th><th>Tác dụng lên ràng buộc</th></tr></thead>
+      <tbody>
+        <tr><td><code>size</code>, <code>width</code>, <code>height</code></td><td>Đề xuất một kích thước chính xác, nhưng <em>vẫn tôn trọng</em> ràng buộc đang có: nếu vượt quá khoảng cho phép thì bị kẹp lại.</td></tr>
+        <tr><td><code>requiredSize</code>, <code>requiredWidth</code>, <code>requiredHeight</code></td><td>Ép đúng kích thước bất chấp ràng buộc của cha. Nếu lớn hơn chỗ được cấp, phần tử được căn giữa và tràn ra ngoài.</td></tr>
+        <tr><td><code>fillMaxWidth(fraction)</code>, <code>fillMaxHeight</code>, <code>fillMaxSize</code></td><td>Đặt ràng buộc chính xác bằng tối đa nhân với <code>fraction</code> (mặc định <code>1f</code>). Không có tác dụng nếu tối đa là vô cực.</td></tr>
+        <tr><td><code>wrapContentSize(align)</code></td><td>Bỏ giới hạn tối thiểu, cho phép nội dung nhỏ hơn mức cha yêu cầu, rồi căn nội dung theo <code>align</code> trong phần còn lại.</td></tr>
+        <tr><td><code>sizeIn</code>, <code>widthIn(min, max)</code>, <code>heightIn(min, max)</code></td><td>Thu hẹp khoảng cho phép, ví dụ "cao ít nhất 56dp, rộng nhiều nhất 400dp".</td></tr>
+        <tr><td><code>defaultMinSize(minWidth, minHeight)</code></td><td>Đặt kích thước tối thiểu chỉ khi cha chưa đặt; dùng làm giá trị mặc định cho component tự viết.</td></tr>
+        <tr><td><code>weight(1f)</code> (Row/Column)</td><td>Chia phần không gian còn lại sau khi các con không có weight đã được đo.</td></tr>
+        <tr><td><code>aspectRatio(16f / 9f)</code></td><td>Giữ tỉ lệ rộng/cao: biết một chiều sẽ suy ra chiều còn lại.</td></tr>
+      </tbody>
+    </table></div>
+    <p>Ví dụ dễ nhầm: <code>Modifier.fillMaxSize().size(50.dp)</code> vẫn phủ kín màn hình, vì <code>fillMaxSize</code> đã tạo ràng buộc chính xác nên <code>size</code> không thể đổi. Muốn một hộp 50dp nằm giữa vùng lớn, chèn <code>wrapContentSize()</code> vào giữa:</p>
+    <pre><code class="language-kotlin">Box(
+    modifier = Modifier
+        .fillMaxSize()
+        .wrapContentSize()        // nới tối thiểu về 0, căn giữa
+        .size(50.dp)
+        .background(Color.Blue)
+)</code></pre>
+
+    <h4>BoxWithConstraints: đổi bố cục theo không gian thực tế</h4>
+    <p><code>BoxWithConstraints</code> giống <code>Box</code> nhưng cho bạn đọc ràng buộc nhận từ cha qua <code>maxWidth</code>, <code>maxHeight</code>, <code>minWidth</code>, <code>minHeight</code> (đơn vị dp). Dựa vào đó bạn chọn hiển thị nội dung khác nhau, ví dụ xếp dọc khi hẹp và xếp ngang khi rộng.</p>
+
+    <h4>Đo nội tại (intrinsic measurements)</h4>
+    <p>Đôi khi cha cần biết con "muốn" lớn bao nhiêu <em>trước khi</em> đo thật. <code>Modifier.height(IntrinsicSize.Min)</code> hỏi các con: "chiều cao tối thiểu để hiển thị đủ nội dung là bao nhiêu?" rồi dùng giá trị lớn nhất làm chiều cao chính xác cho layout. Câu hỏi này không tính là đo lần hai, nên không phạm quy tắc đo một lượt. Có cả <code>IntrinsicSize.Max</code> và các biến thể cho chiều rộng.</p>
+
+    <h4>Biết kích thước sau khi đo: onSizeChanged</h4>
+    <p><code>Modifier.onSizeChanged { size -&gt; }</code> báo kích thước (đơn vị pixel, kiểu <code>IntSize</code>) mỗi khi phần tử đổi kích thước. Đổi sang dp bằng <code>with(LocalDensity.current) { size.width.toDp() }</code>. Chỉ nên dùng để ghi nhận thông tin, không nên dùng để thay đổi bố cục của chính phần tử đó.</p>
+
+    <h4>dp và sp</h4>
+    <ul>
+      <li><code>dp</code> (density-independent pixel): đơn vị cho kích thước, khoảng cách, độ dày viền. 1dp có độ lớn vật lý gần như nhau trên mọi màn hình.</li>
+      <li><code>sp</code> (scale-independent pixel): chỉ dành cho cỡ chữ. Ngoài mật độ màn hình, <code>sp</code> còn thay đổi theo cỡ chữ người dùng chọn trong Cài đặt.</li>
+    </ul>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>1. size bị kẹp, requiredSize thì tràn</h4>
+    <pre><code class="language-kotlin">@Preview(showBackground = true, widthDp = 320, heightDp = 200)
+@Composable
+fun SizeVsRequiredSizeDemo() {
+    Row(
+        modifier = Modifier.padding(40.dp),
+        horizontalArrangement = Arrangement.spacedBy(60.dp)
+    ) {
+        // Cha 80dp, con xin 120dp bằng size: bị kẹp còn 80dp
+        Box(Modifier.size(80.dp).border(2.dp, Color.Gray)) {
+            Box(Modifier.size(120.dp).background(Color(0x664CAF50)))
+        }
+        // Cha 80dp, con xin 120dp bằng requiredSize: giữ 120dp và tràn ra
+        Box(Modifier.size(80.dp).border(2.dp, Color.Gray)) {
+            Box(Modifier.requiredSize(120.dp).background(Color(0x66F44336)))
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Ô bên trái: hình vuông xanh lá vừa khít trong viền xám 80dp. Ô bên phải: hình vuông đỏ 120dp lấn ra ngoài viền xám đều 20dp mỗi phía, vì phần thừa được căn giữa.</p>
+
+    <h4>2. Đường kẻ dọc cao bằng hai cột chữ (IntrinsicSize.Min)</h4>
+    <pre><code class="language-kotlin">@Composable
+fun WeatherCompare(modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min)   // cao bằng cột cao nhất
+            .padding(16.dp)
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text("Hôm nay", style = MaterialTheme.typography.titleMedium)
+            Text("31°C, nắng nhẹ")
+        }
+        VerticalDivider(
+            modifier = Modifier
+                .padding(horizontal = 16.dp)
+                .fillMaxHeight()
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text("Ngày mai", style = MaterialTheme.typography.titleMedium)
+            Text("27°C, mưa rào buổi chiều")
+            Text("Gió đông nam cấp 3")
+            Text("Độ ẩm 85%")
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun WeatherComparePreview() {
+    WeatherCompare()
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Hai cột thông tin thời tiết, ở giữa là một đường kẻ dọc mảnh cao đúng bằng cột bên phải (cột nhiều dòng hơn). Nếu bỏ dòng <code>height(IntrinsicSize.Min)</code>, đường kẻ dùng <code>fillMaxHeight()</code> sẽ kéo cả Row cao bằng toàn bộ không gian cha cho phép.</p>
+
+    <h4>3. Thẻ sản phẩm tự đổi bố cục bằng BoxWithConstraints</h4>
+    <pre><code class="language-kotlin">@Composable
+fun ProductInfoCard(modifier: Modifier = Modifier) {
+    BoxWithConstraints(modifier = modifier.fillMaxWidth().padding(16.dp)) {
+        if (maxWidth &lt; 480.dp) {
+            // Hẹp: ảnh trên, thông tin dưới
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                ProductImage(Modifier.fillMaxWidth())
+                ProductDetails()
+            }
+        } else {
+            // Rộng: ảnh trái, thông tin phải, mỗi bên một nửa
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                ProductImage(Modifier.weight(1f))
+                ProductDetails(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProductImage(modifier: Modifier = Modifier) {
+    Image(
+        painter = painterResource(R.drawable.product_headphones),
+        contentDescription = "Tai nghe không dây",
+        contentScale = ContentScale.Crop,
+        modifier = modifier
+            .aspectRatio(4f / 3f)
+            .clip(RoundedCornerShape(12.dp))
+    )
+}
+
+@Composable
+private fun ProductDetails(modifier: Modifier = Modifier) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text("Tai nghe không dây X2", style = MaterialTheme.typography.titleLarge)
+        Text(
+            text = "1.290.000 đ",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            text = "Pin 30 giờ, chống ồn chủ động, kết nối hai thiết bị cùng lúc.",
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@Preview(name = "Điện thoại", widthDp = 360, showBackground = true)
+@Preview(name = "Máy tính bảng", widthDp = 700, showBackground = true)
+@Composable
+fun ProductInfoCardPreview() {
+    ProductInfoCard()
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Ở bản xem trước rộng 360dp, ảnh tỉ lệ 4:3 chiếm hết chiều ngang và thông tin nằm bên dưới. Ở bản 700dp, ảnh và thông tin đứng cạnh nhau, mỗi bên một nửa.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li><strong>Không cố định chiều cao vùng chứa chữ.</strong> Viết <code>height(48.dp)</code> cho một nút hay một dòng có chữ, khi người dùng tăng cỡ chữ hệ thống, chữ sẽ bị cắt. Hãy dùng <code>heightIn(min = 48.dp)</code> để vừa có chiều cao tối thiểu vừa cho phép giãn ra.</li>
+      <li><strong>Đọc chuỗi kích thước từ trái sang phải.</strong> Modifier đứng trước "thắng": sau <code>fillMaxSize()</code> hay <code>size()</code>, các modifier kích thước phía sau chỉ còn chọn trong khoảng đã bị thu hẹp.</li>
+      <li><strong>Cẩn thận với ràng buộc vô cực.</strong> Bên trong vùng <code>verticalScroll</code>, chiều cao tối đa là vô cực nên <code>fillMaxHeight()</code> không có tác dụng, và đặt một <a href="#lazy-list">LazyColumn</a> vào đó sẽ gây lỗi.</li>
+      <li><strong><code>BoxWithConstraints</code> tốn kém hơn <code>Box</code></strong> vì nội dung chỉ được tạo sau khi biết ràng buộc. Dùng cho từng thành phần cụ thể; còn để đổi bố cục cả màn hình theo kích thước cửa sổ, hãy dùng window size class (xem <a href="#adaptive">Giao diện thích ứng</a>).</li>
+      <li><strong>Không phải layout nào cũng hỗ trợ đo nội tại.</strong> Đặt <code>IntrinsicSize</code> lên cha của <code>LazyColumn</code>, <code>BoxWithConstraints</code> hay layout dùng subcomposition sẽ gây lỗi lúc chạy.</li>
+      <li><strong>Tránh vòng lặp với <code>onSizeChanged</code>.</strong> Lưu kích thước vào state rồi dùng nó để đổi kích thước chính phần tử đó sẽ khiến giao diện bị giật một khung hình hoặc lặp vô hạn. Ưu tiên giải quyết bằng ràng buộc, <code>weight</code> hoặc <code>BoxWithConstraints</code>.</li>
+      <li><strong>Không dùng <code>sp</code> cho kích thước khung</strong> và không dùng <code>dp</code> cho cỡ chữ; sai đơn vị sẽ làm hỏng trải nghiệm của người dùng phóng to chữ.</li>
+    </ul>
+    <div class="callout tip"><strong>Mẹo:</strong> Khi bố cục "lạ", hãy tạm thêm <code>.border(1.dp, Color.Red)</code> vào từng phần tử nghi vấn và xem <a href="#preview">Preview</a>: bạn sẽ thấy ngay phần tử nào lớn hơn hay nhỏ hơn bạn nghĩ.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/layouts/constraints-modifiers" target="_blank" rel="noopener">Constraints and modifier order</a> và <a href="https://developer.android.com/develop/ui/compose/layouts/intrinsic-measurements" target="_blank" rel="noopener">Intrinsic measurements in Compose layouts</a></p>
+</section>

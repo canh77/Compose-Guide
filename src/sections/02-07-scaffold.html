@@ -1,0 +1,192 @@
+<section class="topic" id="scaffold" data-title="Scaffold">
+  <h2>Scaffold và thanh ứng dụng</h2>
+  <p class="lead"><code>Scaffold</code> là "khung xương" của một màn hình Material: nó có sẵn chỗ cho thanh trên cùng, thanh dưới cùng, nút nổi và snackbar, đồng thời tự tính khoảng trống để nội dung không bị các thanh này che mất.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p><code>Scaffold</code> là một composable trong Material 3 nhận các <em>slot</em> (ô trống nhận một hàm composable) cho từng thành phần quen thuộc của màn hình: <code>topBar</code>, <code>bottomBar</code>, <code>floatingActionButton</code>, <code>snackbarHost</code> và <code>content</code>. Scaffold đo các thanh trước, rồi đưa phần còn lại cho <code>content</code> kèm một giá trị <code>PaddingValues</code> (thường đặt tên <code>innerPadding</code>) cho biết cần chừa bao nhiêu ở mỗi cạnh.</p>
+    <p>Trong hệ View cũ, bạn ghép thủ công <code>CoordinatorLayout</code> + <code>AppBarLayout</code> + <code>Toolbar</code> + <code>FloatingActionButton</code> trong XML, cộng thêm các <code>layout_behavior</code> để thanh tiêu đề thu gọn khi cuộn. Với Compose, toàn bộ việc này nằm trong một lời gọi <code>Scaffold</code> và một <code>scrollBehavior</code>.</p>
+    <p><em>Thanh ứng dụng trên cùng</em> (top app bar) hiển thị tiêu đề màn hình, nút điều hướng (quay lại, mở menu) và vài nút hành động. Material 3 có bốn biến thể với độ lớn khác nhau, cùng khả năng thu gọn hoặc ẩn khi người dùng cuộn nội dung.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>Các slot của Scaffold</h4>
+    <div class="table-wrap"><table>
+      <thead>
+        <tr><th>Tham số</th><th>Đặt gì vào</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>topBar</code></td><td><code>TopAppBar</code> hoặc các biến thể bên dưới.</td></tr>
+        <tr><td><code>bottomBar</code></td><td><code>BottomAppBar</code> hoặc thanh điều hướng <code>NavigationBar</code> (xem <a href="#navigation-bar">Thanh điều hướng</a>).</td></tr>
+        <tr><td><code>floatingActionButton</code></td><td><code>FloatingActionButton</code> hoặc <code>ExtendedFloatingActionButton</code> cho hành động chính của màn hình.</td></tr>
+        <tr><td><code>floatingActionButtonPosition</code></td><td>Vị trí nút nổi: <code>FabPosition.End</code> (mặc định), <code>Center</code>, <code>Start</code>, <code>EndOverlay</code>.</td></tr>
+        <tr><td><code>snackbarHost</code></td><td><code>SnackbarHost(snackbarHostState)</code> để hiện thông báo ngắn (xem <a href="#progress-snackbar">Snackbar</a>).</td></tr>
+        <tr><td><code>containerColor</code></td><td>Màu nền màn hình, mặc định lấy từ theme.</td></tr>
+        <tr><td><code>contentWindowInsets</code></td><td>Phần thanh hệ thống mà nội dung cần tránh (xem <a href="#edge-to-edge">Tràn viền</a>).</td></tr>
+        <tr><td><code>content</code></td><td>Nội dung chính, dạng <code>{ innerPadding -&gt; … }</code>. <strong>Bắt buộc phải dùng <code>innerPadding</code></strong>.</td></tr>
+      </tbody>
+    </table></div>
+    <div class="callout warn"><strong>Cảnh báo:</strong> Nếu bỏ qua <code>innerPadding</code>, phần đầu nội dung sẽ nằm dưới thanh tiêu đề và phần cuối bị thanh dưới/thanh điều hướng che. Android Studio sẽ báo lỗi lint <code>UnusedMaterial3ScaffoldPaddingParameter</code>. Áp dụng bằng <code>Modifier.padding(innerPadding)</code>, hoặc với danh sách thì truyền vào <code>contentPadding = innerPadding</code>.</div>
+
+    <h4>Bốn biến thể thanh trên cùng</h4>
+    <div class="table-wrap"><table>
+      <thead>
+        <tr><th>Composable</th><th>Hình dạng</th><th>Thường dùng cho</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>TopAppBar</code></td><td>Một dòng, tiêu đề nhỏ căn trái.</td><td>Hầu hết các màn hình.</td></tr>
+        <tr><td><code>CenterAlignedTopAppBar</code></td><td>Một dòng, tiêu đề căn giữa.</td><td>Màn hình chính, ít nút hành động.</td></tr>
+        <tr><td><code>MediumTopAppBar</code></td><td>Hai tầng, tiêu đề cỡ vừa nằm dưới hàng nút.</td><td>Màn danh sách, chi tiết muốn tiêu đề nổi bật hơn.</td></tr>
+        <tr><td><code>LargeTopAppBar</code></td><td>Cao nhất, tiêu đề cỡ lớn.</td><td>Màn cấp cao nhất, nhấn mạnh tiêu đề; thu gọn khi cuộn.</td></tr>
+      </tbody>
+    </table></div>
+    <p>Tham số chung: <code>title</code> (tiêu đề), <code>navigationIcon</code> (nút bên trái, thường là "Quay lại" hoặc "Menu"), <code>actions</code> (các <code>IconButton</code> bên phải, đặt trong một <code>Row</code> sẵn có), <code>colors</code> (qua <code>TopAppBarDefaults.topAppBarColors(…)</code>) và <code>scrollBehavior</code>.</p>
+    <div class="callout info"><strong>Lưu ý:</strong> Các thanh trên cùng và <code>scrollBehavior</code> của Material 3 có thể vẫn được đánh dấu thử nghiệm (tùy phiên bản), nên hàm dùng chúng thường cần thêm <code>@OptIn(ExperimentalMaterial3Api::class)</code>. Annotation này chỉ báo cho trình biên dịch biết bạn chấp nhận API có thể đổi ở bản sau; nó không làm app chạy khác đi.</div>
+
+    <h4>Hành vi khi cuộn</h4>
+    <div class="table-wrap"><table>
+      <thead>
+        <tr><th>scrollBehavior</th><th>Hiệu ứng</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>TopAppBarDefaults.pinnedScrollBehavior()</code></td><td>Thanh đứng yên; chỉ đổi màu nền khi có nội dung cuộn bên dưới.</td></tr>
+        <tr><td><code>TopAppBarDefaults.enterAlwaysScrollBehavior()</code></td><td>Cuộn xuống thì thanh trượt ẩn đi; cuộn lên một chút là hiện lại ngay.</td></tr>
+        <tr><td><code>TopAppBarDefaults.exitUntilCollapsedScrollBehavior()</code></td><td>Dùng với Medium/Large: thu gọn về một dòng khi cuộn xuống, chỉ mở rộng lại khi cuộn về đầu danh sách.</td></tr>
+      </tbody>
+    </table></div>
+    <p>Để thanh "nghe" được sự kiện cuộn, bạn phải nối hai đầu: truyền <code>scrollBehavior</code> vào thanh, và gắn <code>Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)</code> lên <code>Scaffold</code> (hoặc bất kỳ phần tử cha nào bao lấy nội dung cuộn).</p>
+
+    <h4>Thanh dưới cùng <code>BottomAppBar</code></h4>
+    <p class="code-caption">BottomAppBar chứa các nút hành động phụ và có thể "ôm" luôn nút nổi:</p>
+    <pre><code class="language-kotlin">BottomAppBar(
+    actions = {
+        IconButton(onClick = { /* thêm checklist */ }) {
+            Icon(painterResource(R.drawable.ic_checklist), contentDescription = "Danh sách việc")
+        }
+        IconButton(onClick = { /* chèn ảnh */ }) {
+            Icon(painterResource(R.drawable.ic_image), contentDescription = "Chèn ảnh")
+        }
+    },
+    floatingActionButton = {
+        FloatingActionButton(
+            onClick = { /* ghi chú mới */ },
+            containerColor = BottomAppBarDefaults.bottomAppBarFabColor,
+            elevation = FloatingActionButtonDefaults.bottomAppBarFabElevation()
+        ) {
+            Icon(painterResource(R.drawable.ic_add), contentDescription = "Ghi chú mới")
+        }
+    }
+)</code></pre>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>Ví dụ 1: Màn chi tiết liên hệ với TopAppBar</h4>
+    <pre><code class="language-kotlin">@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ContactDetailScreen(name: String, phone: String, onBack: () -&gt; Unit) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(name) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = "Quay lại")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { /* sửa */ }) {
+                        Icon(painterResource(R.drawable.ic_edit), contentDescription = "Sửa liên hệ")
+                    }
+                    IconButton(onClick = { /* gọi */ }) {
+                        Icon(painterResource(R.drawable.ic_call), contentDescription = "Gọi điện")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            )
+        }
+    ) { innerPadding -&gt;
+        Column(
+            modifier = Modifier
+                .padding(innerPadding)
+                .padding(16.dp)
+        ) {
+            Text("Số điện thoại", style = MaterialTheme.typography.labelMedium)
+            Text(phone, style = MaterialTheme.typography.titleMedium)
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Thanh trên cùng màu nhạt của theme, bên trái có mũi tên quay lại, giữa là tên liên hệ, bên phải hai biểu tượng "Sửa" và "Gọi". Thông tin số điện thoại nằm ngay dưới thanh, không bị che.</p>
+
+    <h4>Ví dụ 2: Danh sách ghi chú, thanh tiêu đề thu gọn khi cuộn và FAB</h4>
+    <pre><code class="language-kotlin">import androidx.compose.ui.input.nestedscroll.nestedScroll
+import kotlinx.coroutines.launch
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NotesScreen(notes: List&lt;String&gt;) {
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
+    Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            LargeTopAppBar(
+                title = { Text("Ghi chú của tôi") },
+                actions = {
+                    IconButton(onClick = { /* mở tìm kiếm */ }) {
+                        Icon(painterResource(R.drawable.ic_search), contentDescription = "Tìm kiếm")
+                    }
+                },
+                scrollBehavior = scrollBehavior
+            )
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = {
+                scope.launch { snackbarHostState.showSnackbar("Đã tạo ghi chú mới") }
+            }) {
+                Icon(painterResource(R.drawable.ic_add), contentDescription = "Thêm ghi chú")
+            }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { innerPadding -&gt;
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = innerPadding
+        ) {
+            items(notes) { note -&gt;
+                ListItem(headlineContent = { Text(note) })
+                HorizontalDivider()
+            }
+        }
+    }
+}
+
+@Preview
+@Composable
+fun NotesScreenPreview() {
+    MaterialTheme { NotesScreen(List(30) { "Ghi chú số ${it + 1}" }) }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Ban đầu tiêu đề "Ghi chú của tôi" hiển thị cỡ lớn. Khi cuộn danh sách xuống, thanh co dần về một dòng với tiêu đề nhỏ; cuộn về đầu thì nó mở rộng lại. Nút "+" ở góc dưới phải; bấm vào sẽ hiện snackbar "Đã tạo ghi chú mới" ngay phía trên nút, Scaffold tự sắp xếp để hai thành phần không đè lên nhau.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li>Với danh sách, truyền <code>innerPadding</code> vào <code>contentPadding</code> thay vì <code>Modifier.padding</code>: nội dung vẫn cuộn được ra sau thanh dưới/thanh hệ thống, nhưng phần tử cuối không bị che.</li>
+      <li>Quên gắn <code>Modifier.nestedScroll(…)</code> là lỗi phổ biến nhất: thanh không hề thu gọn dù đã truyền <code>scrollBehavior</code>.</li>
+      <li>Mỗi màn hình chỉ nên có một <code>Scaffold</code>. Nếu buộc phải lồng (ví dụ Scaffold của từng tab nằm trong Scaffold chứa thanh điều hướng), đặt <code>contentWindowInsets = WindowInsets(0)</code> cho Scaffold bên trong để khoảng trống thanh hệ thống không bị cộng hai lần.</li>
+      <li>Giữ tối đa khoảng 3 nút trong <code>actions</code>; các hành động ít dùng hơn đưa vào menu tràn (xem <a href="#dialog-sheet-menu">Menu</a>).</li>
+      <li>Mỗi <code>IconButton</code> chỉ có biểu tượng phải có <code>contentDescription</code> rõ nghĩa để trình đọc màn hình đọc được (xem <a href="#accessibility">Trợ năng</a>).</li>
+      <li>Nút nổi chỉ dành cho <strong>một</strong> hành động chính của màn hình. Muốn nút có chữ, dùng <code>ExtendedFloatingActionButton</code>; tham số <code>expanded</code> giúp thu nó về dạng chỉ có biểu tượng khi người dùng cuộn.</li>
+    </ul>
+    <div class="callout tip"><strong>Mẹo:</strong> Scaffold và các thanh Material 3 đã tự xử lý vùng thanh trạng thái và thanh điều hướng của hệ thống. Bạn chỉ cần bật tràn viền và áp dụng <code>innerPadding</code>; chi tiết ở mục <a href="#edge-to-edge">Tràn viền và WindowInsets</a>.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/components/scaffold" target="_blank" rel="noopener">Scaffold</a>, <a href="https://developer.android.com/develop/ui/compose/components/app-bars" target="_blank" rel="noopener">App bars</a></p>
+</section>

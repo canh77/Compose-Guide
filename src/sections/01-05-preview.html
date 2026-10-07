@@ -1,0 +1,182 @@
+<section class="topic" id="preview" data-title="@Preview">
+  <h2>Xem trước với @Preview</h2>
+  <p class="lead"><code>@Preview</code> cho phép xem giao diện của một hàm composable ngay trong Android Studio mà không cần chạy app trên máy ảo. Dùng tốt, bạn có thể kiểm tra cùng lúc giao diện sáng/tối, chữ to, màn hình lớn và nhiều bộ dữ liệu khác nhau.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p><strong>Preview</strong> là một hàm composable không tham số, gắn thêm annotation <code>@Preview</code>. Android Studio tìm các hàm này và hiển thị kết quả trong cửa sổ <em>Design</em> (hoặc <em>Split</em>) bên cạnh code. Preview không chạy toàn bộ app: nó chỉ dựng riêng phần giao diện của hàm đó trong một môi trường giả lập.</p>
+    <p>Với hệ thống View, Layout Editor chỉ xem trước được file XML và thường khó hiện đúng dữ liệu thật. Với Compose, preview chính là code Kotlin, nên bạn truyền dữ liệu mẫu tùy ý, ghép nhiều cấu hình, và sửa xong là thấy ngay.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>Thư viện cần có</h4>
+    <pre><code class="language-kotlin">dependencies {
+    implementation(platform("androidx.compose:compose-bom:2026.09.00"))
+    implementation("androidx.compose.ui:ui-tooling-preview") // chứa annotation @Preview
+    debugImplementation("androidx.compose.ui:ui-tooling")    // công cụ hiển thị, chỉ cần ở bản debug
+}</code></pre>
+    <p>Template <em>Empty Activity</em> đã thêm sẵn hai dòng này — xem <a href="#thiet-lap-du-an">Thiết lập dự án</a>.</p>
+
+    <h4>Các tham số của <code>@Preview</code></h4>
+    <div class="table-wrap"><table>
+      <thead>
+        <tr><th>Tham số</th><th>Ý nghĩa</th><th>Ví dụ</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>name</code></td><td>Tên hiển thị trên đầu preview</td><td><code>name = "Chế độ tối"</code></td></tr>
+        <tr><td><code>group</code></td><td>Nhóm preview, dùng để lọc khi có nhiều preview</td><td><code>group = "Cỡ chữ"</code></td></tr>
+        <tr><td><code>showBackground</code></td><td>Vẽ nền phía sau (mặc định trong suốt)</td><td><code>showBackground = true</code></td></tr>
+        <tr><td><code>backgroundColor</code></td><td>Màu nền dạng ARGB <code>Long</code>, cần kèm <code>showBackground</code></td><td><code>backgroundColor = 0xFFFFF3E0</code></td></tr>
+        <tr><td><code>widthDp</code>, <code>heightDp</code></td><td>Kích thước vùng preview tính bằng dp</td><td><code>widthDp = 320</code></td></tr>
+        <tr><td><code>uiMode</code></td><td>Chế độ giao diện, thường dùng để bật chế độ tối</td><td><code>uiMode = Configuration.UI_MODE_NIGHT_YES</code></td></tr>
+        <tr><td><code>locale</code></td><td>Ngôn ngữ dùng để lấy chuỗi từ <code>strings.xml</code></td><td><code>locale = "vi"</code></td></tr>
+        <tr><td><code>fontScale</code></td><td>Hệ số phóng chữ (như cài đặt cỡ chữ của máy)</td><td><code>fontScale = 1.5f</code></td></tr>
+        <tr><td><code>device</code></td><td>Mô phỏng một thiết bị hoặc kích thước tùy chỉnh</td><td><code>device = Devices.TABLET</code>, <code>device = "spec:width=411dp,height=891dp"</code></td></tr>
+        <tr><td><code>showSystemUi</code></td><td>Hiện cả thanh trạng thái và thanh điều hướng</td><td><code>showSystemUi = true</code></td></tr>
+        <tr><td><code>apiLevel</code></td><td>Mức API dùng để dựng preview</td><td><code>apiLevel = 35</code></td></tr>
+      </tbody>
+    </table></div>
+
+    <h4>Nhiều preview cho một hàm và multipreview</h4>
+    <p><code>@Preview</code> có thể lặp lại nhiều lần trên cùng một hàm, mỗi lần một cấu hình. Khi một bộ cấu hình được dùng ở nhiều nơi, gom chúng vào một <strong>annotation tự tạo</strong> (multipreview) rồi gắn annotation đó lên các hàm preview. Compose có sẵn vài multipreview trong gói <code>androidx.compose.ui.tooling.preview</code>:</p>
+    <ul>
+      <li><code>@PreviewLightDark</code>: một bản sáng, một bản tối.</li>
+      <li><code>@PreviewFontScale</code>: nhiều mức cỡ chữ, từ nhỏ đến rất lớn.</li>
+      <li><code>@PreviewScreenSizes</code>: điện thoại, máy gập, máy tính bảng, desktop.</li>
+      <li><code>@PreviewDynamicColors</code>: thử màu động (dynamic color) với nhiều hình nền.</li>
+    </ul>
+
+    <h4>Dữ liệu mẫu với <code>PreviewParameterProvider</code></h4>
+    <p>Để xem một composable với nhiều bộ dữ liệu, viết một lớp cài đặt <code>PreviewParameterProvider&lt;T&gt;</code> trả về <code>values</code> (một <code>Sequence</code>), rồi đánh dấu tham số của hàm preview bằng <code>@PreviewParameter(TênLớp::class)</code>. Android Studio sinh một preview cho mỗi giá trị.</p>
+
+    <h4>Tương tác và chạy trên thiết bị</h4>
+    <ul>
+      <li><strong>Interactive mode</strong>: bấm nút <em>Start Interactive Mode</em> trên preview để bấm nút, gõ chữ, xem state thay đổi như trên máy thật. Chế độ này chạy trong môi trường cô lập: không có mạng, không truy cập file.</li>
+      <li><strong>Run Preview</strong>: bấm nút chạy trên preview để Android Studio cài riêng composable đó lên máy ảo hoặc điện thoại, tiện kiểm tra cảm giác chạm và hiệu ứng thật.</li>
+    </ul>
+
+    <h4>Phân biệt preview và app thật: <code>LocalInspectionMode</code></h4>
+    <p><code>LocalInspectionMode.current</code> trả về <code>true</code> khi composable đang được dựng trong preview. Dùng nó để thay phần không chạy được trong preview (như ảnh tải từ mạng) bằng hình giữ chỗ.</p>
+    <pre><code class="language-kotlin">@Composable
+fun UserAvatar(url: String, modifier: Modifier = Modifier) {
+    if (LocalInspectionMode.current) {
+        Box(
+            modifier = modifier
+                .size(48.dp)
+                .background(Color.LightGray, CircleShape)
+        )
+    } else {
+        AsyncImage(
+            model = url,
+            contentDescription = "Ảnh đại diện",
+            modifier = modifier
+                .size(48.dp)
+                .clip(CircleShape)
+        )
+    }
+}</code></pre>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>Ví dụ 1: Một hàm, nhiều preview</h4>
+    <pre><code class="language-kotlin">@Composable
+fun ProductRow(name: String, price: String, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = name,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f)
+        )
+        Text(text = price, style = MaterialTheme.typography.titleMedium)
+    }
+}
+
+@Preview(name = "Mặc định", showBackground = true)
+@Preview(name = "Màn hẹp", showBackground = true, widthDp = 240)
+@Preview(name = "Chữ to", showBackground = true, fontScale = 1.8f)
+@Composable
+private fun ProductRowPreview() {
+    MaterialTheme {
+        ProductRow(name = "Tai nghe không dây", price = "590.000đ")
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Cửa sổ Design hiện ba khung: bản thường; bản hẹp 240dp (tên sản phẩm bị xuống dòng); bản chữ to gấp 1,8 lần. Bạn phát hiện ngay giao diện có bị vỡ khi chữ to hay không.</p>
+
+    <h4>Ví dụ 2: Annotation multipreview tự tạo</h4>
+    <pre><code class="language-kotlin">@Preview(name = "Sáng", group = "Chủ đề", showBackground = true)
+@Preview(
+    name = "Tối",
+    group = "Chủ đề",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES or Configuration.UI_MODE_TYPE_NORMAL
+)
+@Preview(name = "Máy tính bảng", group = "Kích thước", device = Devices.TABLET)
+annotation class ShopPreviews
+
+@ShopPreviews
+@Composable
+private fun CartBadgePreview() {
+    MyShopTheme { // theme của app, tự đổi màu theo chế độ sáng/tối
+        Surface {
+            Text(
+                text = "Giỏ hàng (3)",
+                modifier = Modifier.padding(16.dp)
+            )
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun CartBadgeLightDarkPreview() {
+    MyShopTheme {
+        Surface { Text("Giỏ hàng (3)", modifier = Modifier.padding(16.dp)) }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> <code>CartBadgePreview</code> sinh ba preview chia theo hai nhóm "Chủ đề" và "Kích thước"; <code>CartBadgeLightDarkPreview</code> sinh hai preview sáng/tối. Annotation <code>@ShopPreviews</code> dùng lại được cho mọi màn hình khác trong app.</p>
+
+    <h4>Ví dụ 3: Nhiều bộ dữ liệu với <code>@PreviewParameter</code></h4>
+    <pre><code class="language-kotlin">data class Product(val name: String, val price: String)
+
+class ProductProvider : PreviewParameterProvider&lt;Product&gt; {
+    override val values: Sequence&lt;Product&gt; = sequenceOf(
+        Product("Bút bi", "5.000đ"),
+        Product("Balo chống nước dành cho laptop 15,6 inch kèm ngăn phụ", "1.250.000đ"),
+        Product("", "0đ") // trường hợp biên: tên rỗng
+    )
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ProductRowParamPreview(
+    @PreviewParameter(ProductProvider::class) product: Product
+) {
+    MaterialTheme {
+        ProductRow(name = product.name, price = product.price)
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Ba preview nối tiếp nhau: tên ngắn, tên rất dài (được xuống dòng, giá vẫn nằm bên phải) và tên rỗng. Đây là cách nhanh để kiểm tra các trường hợp biên mà không cần sửa code thật.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li><strong>Preview hàm stateless:</strong> chỉ nên preview các composable nhận dữ liệu qua tham số. Màn hình nên tách thành phần "có ViewModel" bao ngoài và phần nội dung stateless bên trong để preview phần nội dung — xem <a href="#state-hoisting">State hoisting</a>.</li>
+      <li><strong>Không dùng ViewModel hay DI trong preview:</strong> hệ thống preview không tạo được repository, use case hay đồ thị dependency của Hilt. Truyền dữ liệu mẫu thay vào đó.</li>
+      <li><strong>Đặt hàm preview là <code>private</code>:</strong> preview vẫn hoạt động, và hàm không lộ ra ngoài file, không làm rối gợi ý code.</li>
+      <li>Hàm preview không được có tham số, trừ tham số gắn <code>@PreviewParameter</code>.</li>
+      <li>Bọc nội dung trong theme của app (và <code>Surface</code> khi cần) để preview hiện đúng màu, font; thiếu theme thì màu sắc sẽ khác app thật.</li>
+      <li>Preview không có mạng, không đọc ghi file và một số API của <code>Context</code> không khả dụng. Dùng <code>LocalInspectionMode</code> để thay thế các phần đó.</li>
+    </ul>
+    <div class="callout tip"><strong>Mẹo:</strong> Trong Android Studio, gõ <code>prev</code> rồi nhấn Tab để sinh nhanh một hàm preview. Khi số preview nhiều, dùng tham số <code>group</code> và bộ lọc nhóm trên thanh công cụ preview để chỉ xem những gì đang sửa.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/tooling/previews?hl=vi" target="_blank" rel="noopener">Xem trước giao diện với composable preview</a></p>
+</section>

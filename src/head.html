@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jetpack Compose cho người mới bắt đầu — Cẩm nang tiếng Việt</title>
+<meta name="description" content="Cẩm nang Jetpack Compose tiếng Việt cho người mới: {{TOPIC_COUNT}} chủ đề, mỗi chủ đề gồm định nghĩa, cách dùng, ví dụ code và những điều cần chú ý. Cập nhật Compose BOM 2026.09.00.">
+<meta name="theme-color" content="#0a7d55">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Jetpack Compose cho người mới bắt đầu">
+<meta property="og:description" content="Cẩm nang tiếng Việt: định nghĩa, cách dùng, ví dụ và chú ý cho {{TOPIC_COUNT}} chủ đề Jetpack Compose.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a7d55'/%3E%3Cpath d='M16 6l8.7 5v10L16 26l-8.7-5V11z' fill='none' stroke='white' stroke-width='2.2' stroke-linejoin='round'/%3E%3Cpath d='M16 16l8.7-5M16 16v10M16 16l-8.7-5' stroke='white' stroke-width='2.2' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('cg-theme');if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+</head>
+<body>
+<a class="skip-link" href="#noi-dung">Bỏ qua đến nội dung</a>
+
+<header class="topbar">
+  <button class="icon-btn menu-btn" id="menuBtn" type="button" aria-label="Mở mục lục" aria-controls="sidebar" aria-expanded="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+  </button>
+  <a class="brand" href="#gioi-thieu">
+    <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#0a7d55"/><path d="M16 6l8.7 5v10L16 26l-8.7-5V11z" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/><path d="M16 16l8.7-5M16 16v10M16 16l-8.7-5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/></svg>
+    <span class="brand-text">Compose Guide<small>Cẩm nang tiếng Việt</small></span>
+  </a>
+  <div class="topbar-spacer"></div>
+  <span class="version-pill" title="Phiên bản Compose BOM dùng trong cẩm nang">BOM 2026.09.00</span>
+  <button class="icon-btn" id="themeBtn" type="button" aria-label="Đổi giao diện sáng hoặc tối">
+    <svg class="theme-icon-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+    <svg class="theme-icon-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+  </button>
+  <a class="icon-btn" href="https://github.com/canh77/Compose-Guide" target="_blank" rel="noopener" aria-label="Mã nguồn trên GitHub">
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.2 19.5c.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.3-3.4-1.3-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.6 1 1.6 1 .9 1.6 2.4 1.1 3 .9.1-.7.4-1.1.6-1.4-2.2-.3-4.6-1.1-4.6-5a3.9 3.9 0 0 1 1-2.7 3.6 3.6 0 0 1 .1-2.7s.8-.3 2.8 1a9.6 9.6 0 0 1 5 0c1.9-1.3 2.8-1 2.8-1 .5 1.4.2 2.4.1 2.7a3.9 3.9 0 0 1 1 2.7c0 3.9-2.3 4.7-4.6 5 .4.3.7.9.7 1.9V21c0 .3.2.6.7.5A10 10 0 0 0 12 2z"/></svg>
+  </a>
+</header>
+
+<div class="layout">
+<aside class="sidebar" id="sidebar">
+  <div class="search">
+    <input type="search" id="search" placeholder="Tìm chủ đề, API… (phím /)" autocomplete="off" aria-label="Tìm trong cẩm nang">
+    <p class="search-status" id="searchStatus" aria-live="polite"></p>
+  </div>
+  <div class="progress">
+    <div class="progress-text"><span>Tiến độ học</span><span id="progressText">0/{{TOPIC_COUNT}}</span></div>
+    <div class="progress-bar"><span id="progressBar"></span></div>
+  </div>
+  <nav class="toc" aria-label="Mục lục">
+{{NAV}}
+  </nav>
+</aside>
+<div class="scrim" id="scrim" hidden></div>
+
+<main class="content" id="noi-dung">
+<section class="hero" id="gioi-thieu">
+  <p class="eyebrow">Cẩm nang tiếng Việt · Cập nhật tháng 10/2026</p>
+  <h1>Jetpack Compose cho người mới bắt đầu</h1>
+  <p class="hero-lead">Học cách xây dựng giao diện Android hiện đại bằng Kotlin, từ hàm <code>@Composable</code> đầu tiên đến điều hướng, animation và kiểm thử. Mỗi chủ đề được trình bày theo cùng một khuôn: định nghĩa, cách dùng, ví dụ code và những điều cần chú ý.</p>
+  <ul class="hero-facts">
+    <li><strong>{{TOPIC_COUNT}}</strong> chủ đề</li>
+    <li><strong>{{CHAPTER_COUNT}}</strong> chương</li>
+    <li>Compose <strong>1.12</strong> · Material 3 <strong>1.4</strong></li>
+    <li>Kotlin <strong>2.x</strong></li>
+  </ul>
+  <div class="hero-actions">
+    <a class="btn btn-primary" href="#compose-la-gi">Bắt đầu từ chương 1</a>
+    <a class="btn" href="#lo-trinh">Xem lộ trình học</a>
+  </div>
+
+  <h2>Cách đọc mỗi chủ đề</h2>
+  <div class="legend">
+    <div class="legend-item l-def"><strong>Định nghĩa</strong><span>Khái niệm là gì và vì sao Compose cần nó.</span></div>
+    <div class="legend-item l-use"><strong>Cách dùng</strong><span>Quy tắc, tham số quan trọng và các biến thể.</span></div>
+    <div class="legend-item l-ex"><strong>Ví dụ</strong><span>Code chạy được, kèm mô tả kết quả trên màn hình.</span></div>
+    <div class="legend-item l-note"><strong>Chú ý</strong><span>Lỗi người mới hay gặp, bẫy hiệu năng và mẹo.</span></div>
+  </div>
+
+  <h2>Trước khi bắt đầu</h2>
+  <ul class="plain">
+    <li>Biết Kotlin cơ bản: biến, hàm, lớp, lambda. Nếu chưa chắc, đọc <a href="#kotlin-can-biet">Kotlin cần biết</a> trước.</li>
+    <li>Cài Android Studio bản ổn định mới nhất và một máy ảo hoặc điện thoại Android để chạy thử.</li>
+    <li>Đọc lần lượt theo chương, gõ lại từng ví dụ, rồi bấm <strong>Đánh dấu đã đọc</strong> ở mỗi chủ đề để theo dõi tiến độ.</li>
+    <li>Nhấn phím <code>/</code> để tìm nhanh một chủ đề hoặc tên API, ví dụ <code>remember</code>, <code>LazyColumn</code>.</li>
+  </ul>
+  <p class="disclaimer">Nội dung được biên soạn bằng tiếng Việt dựa trên tài liệu chính thức của Android Developers; cuối mỗi chủ đề có liên kết tới trang gốc để đọc sâu hơn. Phiên bản thư viện thay đổi thường xuyên, hãy đối chiếu trang <a href="https://developer.android.com/develop/ui/compose/bom/bom-mapping" target="_blank" rel="noopener">BOM mapping</a> trước khi nâng cấp dự án.</p>
+</section>

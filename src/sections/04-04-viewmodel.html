@@ -1,0 +1,299 @@
+<section class="topic" id="viewmodel" data-title="ViewModel &amp; StateFlow">
+  <h2>ViewModel, StateFlow và kiến trúc màn hình</h2>
+  <p class="lead">Khi màn hình bắt đầu có dữ liệu thật (tải từ mạng, đọc cơ sở dữ liệu) và logic xử lý, nhét tất cả vào composable sẽ nhanh chóng rối và dễ mất dữ liệu. ViewModel cùng StateFlow cho bạn một chỗ chuẩn để giữ trạng thái và logic của cả màn hình, còn composable chỉ lo hiển thị.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p><code>ViewModel</code> là một class của thư viện Jetpack Lifecycle, đóng vai trò <strong>state holder cấp màn hình</strong>: giữ trạng thái giao diện của màn hình và logic xử lý (gọi repository, kiểm tra dữ liệu, sắp xếp, lọc...). Điểm đặc biệt là ViewModel sống lâu hơn Activity: khi xoay màn hình, Activity và composition bị tạo lại nhưng nhận lại đúng ViewModel cũ với dữ liệu nguyên vẹn, không phải tải lại.</p>
+    <p>Mỗi ViewModel thuộc về một <code>ViewModelStoreOwner</code> (chủ sở hữu): Activity, Fragment, hoặc từng destination (màn hình đích) của <a href="#navigation">Navigation</a>. Trong cùng một owner, mọi lần lấy cùng class ViewModel đều trả về cùng một đối tượng. ViewModel chỉ bị hủy (hàm <code>onCleared()</code> được gọi) khi owner kết thúc hẳn: Activity bị <code>finish</code>, hoặc destination bị đẩy khỏi back stack. Nó <em>không</em> sống qua process death (xem <a href="#luu-trang-thai">Lưu trạng thái</a>).</p>
+    <p>Để đưa state ra cho UI, cách phổ biến là <code>StateFlow</code>: một luồng dữ liệu (Flow của Kotlin coroutines) luôn có sẵn một giá trị hiện tại và phát giá trị mới cho ai đang theo dõi. Composable biến nó thành Compose State bằng <code>collectAsStateWithLifecycle()</code>. Kết quả là đúng luồng dữ liệu một chiều (<a href="#state-hoisting">UDF</a>): ViewModel giữ <code>UiState</code>, UI hiển thị nó, UI gọi hàm của ViewModel khi có sự kiện.</p>
+    <div class="callout info"><strong>Lưu ý:</strong> Với hệ View cũ, bạn observe <code>LiveData</code> trong Activity rồi tự gán vào từng view. Trong Compose, chỉ cần thu thập state một lần ở cấp màn hình; Compose tự vẽ lại phần thay đổi.</div>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>1. Thêm thư viện</h4>
+    <pre><code class="language-kotlin">// build.gradle.kts của module app
+dependencies {
+    implementation(platform("androidx.compose:compose-bom:2026.09.00"))
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0") // hàm viewModel()
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")   // collectAsStateWithLifecycle()
+}</code></pre>
+
+    <h4>2. Mô tả state màn hình bằng một UiState</h4>
+    <p>Gom mọi thứ màn hình cần hiển thị vào một <code>data class</code> bất biến; giá trị mặc định chính là trạng thái ban đầu. Muốn đổi thì tạo bản mới bằng <code>copy(...)</code>.</p>
+
+    <h4>3. Viết ViewModel</h4>
+    <pre><code class="language-kotlin">data class WeatherUiState(
+    val city: String = "Hà Nội",
+    val isLoading: Boolean = false,
+    val temperature: Int? = null
+)
+
+// Giả sử WeatherRepository có hàm suspend temperatureOf(city: String): Int
+class WeatherViewModel(private val repository: WeatherRepository) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(WeatherUiState())        // chỉ ViewModel được ghi
+    val uiState: StateFlow&lt;WeatherUiState&gt; = _uiState.asStateFlow()  // UI chỉ được đọc
+
+    fun refresh() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            val temp = repository.temperatureOf(_uiState.value.city)
+            _uiState.update { it.copy(isLoading = false, temperature = temp) }
+        }
+    }
+
+    companion object {
+        val Factory: ViewModelProvider.Factory = viewModelFactory {
+            initializer { WeatherViewModel(WeatherRepository()) }
+        }
+    }
+}</code></pre>
+    <ul>
+      <li><code>_uiState</code> (<code>MutableStateFlow</code>) để <code>private</code>; bên ngoài chỉ thấy <code>uiState</code> dạng <code>StateFlow</code> chỉ đọc, nhờ <code>asStateFlow()</code>.</li>
+      <li><code>_uiState.update { it.copy(...) }</code> đọc giá trị hiện tại và ghi giá trị mới một cách an toàn (atomic), kể cả khi nhiều coroutine cùng cập nhật.</li>
+      <li><code>viewModelScope.launch</code> chạy việc bất đồng bộ; mọi coroutine trong scope này tự bị hủy khi ViewModel bị hủy.</li>
+      <li>ViewModel có tham số constructor cần một <strong>factory</strong>: <code>viewModelFactory { initializer { ... } }</code>. Bên trong <code>initializer</code> có thể gọi <code>createSavedStateHandle()</code> để lấy <code>SavedStateHandle</code>.</li>
+    </ul>
+
+    <h4>4. Lấy ViewModel ở cấp màn hình và thu state</h4>
+    <pre><code class="language-kotlin">@Composable
+fun WeatherScreen(
+    viewModel: WeatherViewModel = viewModel(factory = WeatherViewModel.Factory)
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    WeatherContent(uiState = uiState, onRefresh = viewModel::refresh)
+}</code></pre>
+    <p><code>collectAsStateWithLifecycle()</code> chỉ thu thập khi màn hình ít nhất ở trạng thái <code>STARTED</code> (đang hiển thị) và tự dừng khi app xuống nền, giúp tiết kiệm pin và tài nguyên. <code>collectAsState()</code> thì tiếp tục thu thập chừng nào composition còn tồn tại, kể cả khi người dùng không nhìn thấy màn hình. Trên Android, hãy dùng bản <code>WithLifecycle</code>.</p>
+    <p>Nếu dự án dùng Hilt để tiêm phụ thuộc, thay <code>viewModel()</code> bằng <code>hiltViewModel()</code> (thư viện <code>androidx.hilt:hilt-navigation-compose</code> hoặc <code>androidx.hilt:hilt-lifecycle-viewmodel-compose</code>); Hilt tự tạo factory nên không cần viết <code>Factory</code>.</p>
+
+    <h4>5. Tách Screen (stateful) và Content (stateless)</h4>
+    <ul>
+      <li><strong><code>XxxScreen</code></strong>: lấy ViewModel, thu state, nối sự kiện với hàm của ViewModel. Không chứa giao diện chi tiết.</li>
+      <li><strong><code>XxxContent</code></strong>: chỉ nhận <code>uiState</code> và các lambda <code>onXxx</code>. Không biết ViewModel tồn tại, nên preview và test với dữ liệu giả rất dễ.</li>
+      <li>Sự kiện từ UI đơn giản là gọi hàm của ViewModel: <code>onRefresh = viewModel::refresh</code>.</li>
+    </ul>
+
+    <h4>6. Sự kiện một lần (hiện thông báo, chuyển màn hình)</h4>
+    <p>Cách được khuyến nghị: biểu diễn sự kiện như một phần của state, ví dụ <code>userMessage: String?</code> trong <code>UiState</code>. UI hiển thị thông báo, xong thì gọi hàm như <code>userMessageShown()</code> để ViewModel đặt lại thành <code>null</code> ("consume" sự kiện). Ví dụ bên dưới dùng đúng cách này. Một lựa chọn khác hay gặp là <code>Channel</code>:</p>
+    <pre><code class="language-kotlin">// Trong ViewModel
+private val _events = Channel&lt;String&gt;(Channel.BUFFERED)
+val events = _events.receiveAsFlow()
+
+// Trong composable màn hình
+LaunchedEffect(Unit) {
+    viewModel.events.collect { message -&gt; snackbarHostState.showSnackbar(message) }
+}</code></pre>
+    <p>Cách <code>Channel</code> gọn nhưng trong vài tình huống hiếm (UI bị hủy đúng lúc đang xử lý) sự kiện có thể bị mất, nên với sự kiện quan trọng hãy ưu tiên cách lưu trong state.</p>
+
+    <h4>7. Khi dữ liệu đến từ Flow của repository</h4>
+    <pre><code class="language-kotlin">val uiState: StateFlow&lt;NotesUiState&gt; = repository.observeNotes()   // Flow&lt;List&lt;Note&gt;&gt;
+    .map { notes -&gt; NotesUiState(isLoading = false, notes = notes) }
+    .stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = NotesUiState(isLoading = true)
+    )</code></pre>
+    <p><code>WhileSubscribed(5_000)</code> giữ luồng phía trên chạy thêm 5 giây sau khi UI ngừng thu thập: đủ để vượt qua một lần xoay màn hình mà không phải tải lại, nhưng vẫn dừng khi người dùng thật sự rời đi.</p>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>Màn hình Todo đầy đủ</h4>
+    <p class="code-caption">Phần 1: mô hình dữ liệu, repository giả và ViewModel</p>
+    <pre><code class="language-kotlin">import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+
+data class Todo(val id: Long, val title: String, val done: Boolean = false)
+
+data class TodoUiState(
+    val isLoading: Boolean = true,
+    val items: List&lt;Todo&gt; = emptyList(),
+    val userMessage: String? = null
+) {
+    val remaining: Int get() = items.count { !it.done }
+}
+
+class TodoRepository {
+    suspend fun loadTodos(): List&lt;Todo&gt; {
+        delay(1_000) // giả lập đọc cơ sở dữ liệu
+        return listOf(
+            Todo(1, "Học State và remember", done = true),
+            Todo(2, "Làm bài tập ViewModel"),
+            Todo(3, "Đi chợ mua rau")
+        )
+    }
+}
+
+class TodoViewModel(private val repository: TodoRepository) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(TodoUiState())
+    val uiState: StateFlow&lt;TodoUiState&gt; = _uiState.asStateFlow()
+
+    private var nextId = 100L
+
+    init {
+        viewModelScope.launch {
+            val todos = repository.loadTodos()
+            _uiState.update { it.copy(isLoading = false, items = todos) }
+        }
+    }
+
+    fun addTodo(title: String) {
+        val clean = title.trim()
+        if (clean.isEmpty()) return
+        val newTodo = Todo(nextId++, clean)   // tạo ngoài update vì lambda có thể chạy lại
+        _uiState.update { it.copy(items = it.items + newTodo) }
+    }
+
+    fun toggleDone(id: Long) {
+        _uiState.update { state -&gt;
+            state.copy(items = state.items.map { todo -&gt;
+                if (todo.id == id) todo.copy(done = !todo.done) else todo
+            })
+        }
+    }
+
+    fun deleteTodo(id: Long) {
+        _uiState.update { state -&gt;
+            state.copy(
+                items = state.items.filterNot { it.id == id },
+                userMessage = "Đã xóa một việc"
+            )
+        }
+    }
+
+    fun userMessageShown() {
+        _uiState.update { it.copy(userMessage = null) }
+    }
+
+    companion object {
+        val Factory: ViewModelProvider.Factory = viewModelFactory {
+            initializer { TodoViewModel(TodoRepository()) }
+        }
+    }
+}</code></pre>
+
+    <p class="code-caption">Phần 2: Screen (stateful), Content (stateless) và Preview</p>
+    <pre><code class="language-kotlin">import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+
+@Composable
+fun TodoScreen(
+    viewModel: TodoViewModel = viewModel(factory = TodoViewModel.Factory)
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    TodoContent(
+        uiState = uiState,
+        onAddTodo = viewModel::addTodo,
+        onToggleDone = viewModel::toggleDone,
+        onDelete = viewModel::deleteTodo,
+        onMessageShown = viewModel::userMessageShown
+    )
+}
+
+@Composable
+fun TodoContent(
+    uiState: TodoUiState,
+    onAddTodo: (String) -&gt; Unit,
+    onToggleDone: (Long) -&gt; Unit,
+    onDelete: (Long) -&gt; Unit,
+    onMessageShown: () -&gt; Unit,
+    modifier: Modifier = Modifier
+) {
+    val snackbarHostState = remember { SnackbarHostState() }
+    val input = rememberTextFieldState()
+
+    // Sự kiện một lần: hiện snackbar rồi báo ViewModel đã "consume"
+    uiState.userMessage?.let { message -&gt;
+        LaunchedEffect(message) {
+            snackbarHostState.showSnackbar(message)
+            onMessageShown()
+        }
+    }
+
+    Scaffold(
+        modifier = modifier,
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { innerPadding -&gt;
+        Column(
+            Modifier
+                .padding(innerPadding)
+                .padding(16.dp)
+        ) {
+            Text("Còn ${uiState.remaining} việc chưa xong", style = MaterialTheme.typography.titleMedium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    state = input,
+                    label = { Text("Việc mới") },
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.width(8.dp))
+                Button(onClick = {
+                    onAddTodo(input.text.toString())
+                    input.clearText()
+                }) { Text("Thêm") }
+            }
+            Spacer(Modifier.height(8.dp))
+            if (uiState.isLoading) {
+                CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
+            } else {
+                LazyColumn {
+                    items(uiState.items, key = { it.id }) { todo -&gt;
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = todo.done, onCheckedChange = { onToggleDone(todo.id) })
+                            Text(todo.title, Modifier.weight(1f))
+                            TextButton(onClick = { onDelete(todo.id) }) { Text("Xóa") }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun TodoContentPreview() {
+    MaterialTheme {
+        TodoContent(
+            uiState = TodoUiState(
+                isLoading = false,
+                items = listOf(Todo(1, "Mua sữa"), Todo(2, "Tập thể dục", done = true))
+            ),
+            onAddTodo = {}, onToggleDone = {}, onDelete = {}, onMessageShown = {}
+        )
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Khi mở màn hình, vòng xoay tải hiện khoảng 1 giây rồi danh sách 3 việc xuất hiện, tiêu đề ghi "Còn 2 việc chưa xong". Gõ việc mới và bấm "Thêm", việc đó nằm cuối danh sách và ô nhập được xóa trống. Tick vào ô vuông làm số việc còn lại thay đổi; bấm "Xóa" thì dòng biến mất và snackbar "Đã xóa một việc" hiện ở đáy màn hình. Xoay máy: danh sách giữ nguyên, không tải lại. Preview hiển thị ngay hai việc mẫu mà không cần ViewModel.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <div class="callout warn"><strong>Cảnh báo:</strong> KHÔNG truyền ViewModel xuống các composable con. Chỉ composable cấp màn hình được biết ViewModel; các con nhận dữ liệu và lambda. Truyền ViewModel xuống làm con khó preview, khó test, khó tái sử dụng và dễ gọi lung tung vào logic màn hình.</div>
+    <ul>
+      <li><strong>Không giữ <code>Context</code> của Activity, <code>View</code> hay lambda composable trong ViewModel.</strong> ViewModel sống lâu hơn Activity nên sẽ gây rò rỉ bộ nhớ. Cần <code>Application</code> thì dùng <code>AndroidViewModel</code> hoặc tiêm phụ thuộc.</li>
+      <li><strong>Không gọi <code>viewModel()</code> trong item của danh sách hay composable tái sử dụng:</strong> mọi lần gọi trong cùng owner trả về cùng một đối tượng, không phải mỗi item một cái.</li>
+      <li><strong>Tải dữ liệu trong <code>init</code> hoặc dùng <code>stateIn</code></strong>, không gọi hàm tải trực tiếp trong thân composable (sẽ chạy lại mỗi lần recomposition).</li>
+      <li><strong>Luôn tạo đối tượng mới khi cập nhật:</strong> <code>StateFlow</code> bỏ qua giá trị bằng với giá trị cũ (so sánh <code>equals</code>), nên sửa trực tiếp một <code>MutableList</code> bên trong state sẽ không làm UI cập nhật.</li>
+      <li><strong>ViewModel không sống qua process death.</strong> Giá trị nhỏ cần khôi phục (id, bộ lọc) hãy để trong <code>SavedStateHandle</code> (xem <a href="#luu-trang-thai">Lưu trạng thái</a>). Bạn cũng có thể giữ <code>TextFieldState</code> trong ViewModel khi logic cần đọc trực tiếp nội dung ô nhập.</li>
+      <li><strong>StateFlow không phải lựa chọn duy nhất:</strong> dùng <code>var uiState by mutableStateOf(...)</code> với <code>private set</code> trong ViewModel cũng hợp lệ. StateFlow được ưa chuộng vì kết hợp tốt với các toán tử Flow và không phụ thuộc Compose.</li>
+    </ul>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/topic/libraries/architecture/viewmodel?hl=vi" target="_blank" rel="noopener">ViewModel overview</a>, <a href="https://developer.android.com/develop/ui/compose/architecture?hl=vi" target="_blank" rel="noopener">Architecting your Compose UI</a></p>
+</section>

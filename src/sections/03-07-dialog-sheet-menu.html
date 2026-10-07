@@ -1,0 +1,255 @@
+<section class="topic" id="dialog-sheet-menu" data-title="Dialog, Sheet, Menu">
+  <h2>Dialog, Bottom sheet và Menu</h2>
+  <p class="lead">Dialog, bottom sheet và menu là các lớp giao diện tạm thời hiện đè lên màn hình: hỏi xác nhận, đưa ra danh sách hành động hoặc vài tùy chọn nhanh. Trong Compose, chúng được bật/tắt hoàn toàn bằng state chứ không bằng lệnh <code>show()</code>.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p><strong>Dialog</strong> (hộp thoại) là cửa sổ nhỏ hiện giữa màn hình, chặn tương tác phía sau cho đến khi người dùng quyết định — ví dụ "Xóa ghi chú này?". <strong>Bottom sheet</strong> là tấm bảng trượt lên từ cạnh dưới, chứa nội dung hoặc hành động phụ như danh sách cách chia sẻ. <strong>Menu</strong> là danh sách tùy chọn ngắn bật ra ngay cạnh phần tử được bấm, điển hình là menu ba chấm.</p>
+    <p>Ở hệ View, bạn gọi <code>AlertDialog.Builder(...).show()</code> hay <code>PopupMenu.show()</code> — kiểu ra lệnh (imperative). Compose làm theo kiểu khai báo (declarative): dialog <em>tồn tại khi nó nằm trong composition</em>. Bạn giữ một biến <code>Boolean</code>; khi biến là <code>true</code>, đoạn code vẽ dialog chạy và dialog xuất hiện; khi về <code>false</code>, dialog biến mất. Nhờ vậy trạng thái "đang mở" là dữ liệu bình thường, có thể lưu, khôi phục và kiểm thử như mọi state khác (xem <a href="#state-remember">State và remember</a>).</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+
+    <h4>1. Mẫu chung: điều khiển bằng state</h4>
+    <pre><code class="language-kotlin">var show by remember { mutableStateOf(false) }
+
+Button(onClick = { show = true }) { Text("Mở") }
+
+if (show) {
+    AlertDialog(
+        onDismissRequest = { show = false }, // bấm ra ngoài hoặc nút Back
+        confirmButton = { TextButton(onClick = { show = false }) { Text("OK") } },
+        text = { Text("Xin chào!") }
+    )
+}</code></pre>
+
+    <h4>2. AlertDialog</h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Tham số</th><th>Công dụng</th></tr></thead>
+      <tbody>
+        <tr><td><code>onDismissRequest</code></td><td>Gọi khi người dùng bấm ra ngoài hoặc nhấn Back. Thường đặt state về <code>false</code>.</td></tr>
+        <tr><td><code>confirmButton</code></td><td>Bắt buộc. Slot cho nút xác nhận, thường là <code>TextButton</code>.</td></tr>
+        <tr><td><code>dismissButton</code></td><td>Slot cho nút hủy, nằm bên trái nút xác nhận.</td></tr>
+        <tr><td><code>icon</code></td><td>Icon nhỏ phía trên tiêu đề.</td></tr>
+        <tr><td><code>title</code></td><td>Tiêu đề ngắn, nên là câu hỏi rõ ràng.</td></tr>
+        <tr><td><code>text</code></td><td>Nội dung giải thích hậu quả của hành động.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h4>3. Dialog tùy biến với DialogProperties</h4>
+    <p>Khi cần bố cục riêng (biểu mẫu đổi tên, ảnh lớn…), dùng <code>Dialog</code> từ <code>androidx.compose.ui.window</code>. <code>Dialog</code> chỉ cung cấp "cửa sổ" — nó không có nền, góc bo hay padding — nên bạn phải tự bọc nội dung trong <code>Card</code> hoặc <code>Surface</code>. <code>DialogProperties</code> điều chỉnh hành vi:</p>
+    <pre><code class="language-kotlin">Dialog(
+    onDismissRequest = { showRename = false },
+    properties = DialogProperties(
+        dismissOnBackPress = true,       // Back đóng dialog
+        dismissOnClickOutside = false,   // bấm ra ngoài KHÔNG đóng (tránh mất dữ liệu đang gõ)
+        usePlatformDefaultWidth = false  // tự quyết định chiều rộng
+    )
+) {
+    Card(Modifier.fillMaxWidth().padding(24.dp)) {
+        // TextField, nút Lưu/Hủy...
+    }
+}</code></pre>
+
+    <h4>4. ModalBottomSheet</h4>
+    <p><code>ModalBottomSheet</code> và <code>rememberModalBottomSheetState</code> cần <code>@OptIn(ExperimentalMaterial3Api::class)</code> — chú thích này xác nhận bạn chấp nhận dùng API mà Material 3 còn đánh dấu là có thể thay đổi. Các điểm chính:</p>
+    <ul>
+      <li><code>rememberModalBottomSheetState(skipPartiallyExpanded = true)</code>: mở thẳng lên hết chiều cao nội dung. Để <code>false</code> (mặc định) thì với nội dung dài, sheet dừng ở khoảng nửa màn hình trước, người dùng kéo lên để xem tiếp.</li>
+      <li>Vuốt xuống, bấm vùng tối phía trên hoặc nhấn Back sẽ gọi <code>onDismissRequest</code> sau khi sheet đã trượt xuống xong.</li>
+      <li>Khi tự đóng bằng code (ví dụ sau khi chọn một mục), hãy chạy animation trước rồi mới bỏ sheet khỏi composition:</li>
+    </ul>
+    <pre><code class="language-kotlin">scope.launch { sheetState.hide() }.invokeOnCompletion {
+    if (!sheetState.isVisible) showSheet = false
+}</code></pre>
+    <p><code>hide()</code> là hàm <code>suspend</code> chạy animation trượt xuống, nên cần <code>scope = rememberCoroutineScope()</code>. <code>invokeOnCompletion</code> chạy khi animation kết thúc; nếu bạn đặt <code>showSheet = false</code> ngay lập tức, sheet sẽ biến mất "cụt" không có hiệu ứng.</p>
+
+    <h4>5. DropdownMenu</h4>
+    <p><code>DropdownMenu</code> tự canh vị trí theo phần tử cha của nó, vì vậy hãy đặt nó cùng nút mở trong một <code>Box</code>. Mỗi mục là <code>DropdownMenuItem(text, onClick, leadingIcon, trailingIcon, enabled)</code>. Có thể chèn <code>HorizontalDivider()</code> giữa các nhóm mục.</p>
+
+    <h4>6. ExposedDropdownMenuBox</h4>
+    <p>Dùng trong biểu mẫu khi muốn một ô nhập có mũi tên, bấm vào thì xổ danh sách để chọn (giống <code>Spinner</code> cũ). Cũng cần <code>@OptIn(ExperimentalMaterial3Api::class)</code>.</p>
+    <pre><code class="language-kotlin">@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SortPicker() {
+    val options = listOf("Mới nhất", "Cũ nhất", "Tên A–Z")
+    var expanded by remember { mutableStateOf(false) }
+    var selected by remember { mutableStateOf(options[0]) }
+
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+        OutlinedTextField(
+            value = selected,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("Sắp xếp theo") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable)
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { option -&gt;
+                DropdownMenuItem(
+                    text = { Text(option) },
+                    onClick = { selected = option; expanded = false }
+                )
+            }
+        }
+    }
+}</code></pre>
+    <div class="callout info"><strong>Lưu ý:</strong> <code>Modifier.menuAnchor(...)</code> là bắt buộc để menu biết neo vào ô nhập nào. Tham số kiểu neo của nó đã đổi qua vài phiên bản Material 3; nếu Android Studio báo tên đang dùng đã lỗi thời, hãy làm theo gợi ý thay thế mà IDE đề xuất.</div>
+
+    <h4>7. Chọn component nào?</h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Tình huống</th><th>Nên dùng</th></tr></thead>
+      <tbody>
+        <tr><td>Xác nhận hành động nguy hiểm, không hoàn tác được (xóa, đăng xuất)</td><td><code>AlertDialog</code></td></tr>
+        <tr><td>Biểu mẫu nhỏ hoặc bố cục riêng (đổi tên, đánh giá sao)</td><td><code>Dialog</code> + <code>Card</code></td></tr>
+        <tr><td>Nhiều hành động có icon, hoặc nội dung phụ dài (chia sẻ, bộ lọc nâng cao)</td><td><code>ModalBottomSheet</code></td></tr>
+        <tr><td>Vài tùy chọn ngắn gắn với một nút/phần tử cụ thể</td><td><code>DropdownMenu</code></td></tr>
+        <tr><td>Chọn một giá trị cho trường trong biểu mẫu</td><td><code>ExposedDropdownMenuBox</code></td></tr>
+        <tr><td>Thông báo ngắn, không cần người dùng quyết định</td><td>Snackbar — xem <a href="#progress-snackbar">Progress &amp; Snackbar</a></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+
+    <h4>Ví dụ 1: Xác nhận xóa ghi chú</h4>
+    <pre><code class="language-kotlin">@Composable
+fun NoteRow(title: String, onDelete: () -&gt; Unit) {
+    var showConfirm by remember { mutableStateOf(false) }
+
+    ListItem(
+        headlineContent = { Text(title) },
+        trailingContent = {
+            IconButton(onClick = { showConfirm = true }) {
+                Icon(painterResource(R.drawable.ic_delete), contentDescription = "Xóa ghi chú")
+            }
+        }
+    )
+
+    if (showConfirm) {
+        AlertDialog(
+            onDismissRequest = { showConfirm = false },
+            icon = { Icon(painterResource(R.drawable.ic_delete), contentDescription = null) },
+            title = { Text("Xóa ghi chú?") },
+            text = { Text("Ghi chú \"$title\" sẽ bị xóa vĩnh viễn và không thể khôi phục.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showConfirm = false
+                    onDelete()
+                }) { Text("Xóa") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirm = false }) { Text("Hủy") }
+            }
+        )
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Bấm icon thùng rác, một hộp thoại hiện giữa màn hình với icon, tiêu đề "Xóa ghi chú?", đoạn giải thích và hai nút "Hủy" / "Xóa". Bấm ra ngoài, nhấn Back hoặc "Hủy" đều đóng hộp thoại mà không xóa.</p>
+
+    <h4>Ví dụ 2: Bottom sheet chọn cách chia sẻ</h4>
+    <pre><code class="language-kotlin">data class ShareTarget(val label: String, val iconRes: Int)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ShareNoteButton(onShare: (ShareTarget) -&gt; Unit) {
+    var showSheet by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+    val targets = listOf(
+        ShareTarget("Sao chép liên kết", R.drawable.ic_link),
+        ShareTarget("Gửi qua email", R.drawable.ic_mail),
+        ShareTarget("Gửi qua tin nhắn", R.drawable.ic_sms),
+        ShareTarget("Xuất file PDF", R.drawable.ic_picture_as_pdf)
+    )
+
+    Button(onClick = { showSheet = true }) { Text("Chia sẻ") }
+
+    if (showSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showSheet = false },
+            sheetState = sheetState
+        ) {
+            Text(
+                "Chia sẻ ghi chú",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+            )
+            targets.forEach { target -&gt;
+                ListItem(
+                    headlineContent = { Text(target.label) },
+                    leadingContent = { Icon(painterResource(target.iconRes), contentDescription = null) },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    modifier = Modifier.clickable {
+                        onShare(target)
+                        scope.launch { sheetState.hide() }.invokeOnCompletion {
+                            if (!sheetState.isVisible) showSheet = false
+                        }
+                    }
+                )
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Bấm "Chia sẻ", màn hình phía sau tối lại và một tấm bảng bo góc trượt lên từ dưới, có thanh kéo nhỏ ở đầu, tiêu đề và bốn hàng có icon. Chọn một hàng thì tấm bảng trượt xuống mượt mà rồi biến mất.</p>
+
+    <h4>Ví dụ 3: Menu ba chấm cho ghi chú</h4>
+    <pre><code class="language-kotlin">@Composable
+fun NoteOptionsMenu(
+    isPinned: Boolean,
+    onEdit: () -&gt; Unit,
+    onTogglePin: () -&gt; Unit,
+    onDelete: () -&gt; Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            Icon(painterResource(R.drawable.ic_more_vert), contentDescription = "Tùy chọn khác")
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text("Sửa") },
+                leadingIcon = { Icon(painterResource(R.drawable.ic_edit), contentDescription = null) },
+                onClick = { expanded = false; onEdit() }
+            )
+            DropdownMenuItem(
+                text = { Text(if (isPinned) "Bỏ ghim" else "Ghim lên đầu") },
+                leadingIcon = { Icon(painterResource(R.drawable.ic_push_pin), contentDescription = null) },
+                onClick = { expanded = false; onTogglePin() }
+            )
+            HorizontalDivider()
+            DropdownMenuItem(
+                text = { Text("Xóa", color = MaterialTheme.colorScheme.error) },
+                leadingIcon = {
+                    Icon(
+                        painterResource(R.drawable.ic_delete),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                },
+                onClick = { expanded = false; onDelete() }
+            )
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Bấm icon ba chấm, một menu nhỏ bật ra ngay cạnh nút với ba mục "Sửa", "Ghim lên đầu" và (sau đường kẻ) "Xóa" màu đỏ. Chọn một mục hoặc bấm ra ngoài thì menu đóng. Bạn có thể nối mục "Xóa" với hộp thoại ở Ví dụ 1.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li><strong>Luôn đặt state về <code>false</code> trong <code>onDismissRequest</code>.</strong> Nếu để trống, người dùng bấm ra ngoài hay nhấn Back sẽ không đóng được dialog/sheet/menu — trông như app bị treo.</li>
+      <li>State tạo bằng <code>remember</code> mất khi xoay màn hình, nên dialog đang mở sẽ tự đóng. Nếu cần giữ, dùng <code>rememberSaveable</code> hoặc lưu trong ViewModel — xem <a href="#luu-trang-thai">Lưu trạng thái</a>.</li>
+      <li><code>Dialog</code> tùy biến không có nền: quên bọc <code>Card</code>/<code>Surface</code> thì chữ sẽ nằm trơ trên lớp nền tối. Nội dung dài trong dialog nên có <code>verticalScroll</code>.</li>
+      <li>Đóng <code>ModalBottomSheet</code> bằng code: gọi <code>sheetState.hide()</code> rồi mới đặt cờ về <code>false</code> trong <code>invokeOnCompletion</code>, để có animation trượt xuống.</li>
+      <li><code>DropdownMenu</code> hiện sai chỗ (thường ở góc màn hình)? Kiểm tra xem nó có nằm chung <code>Box</code> với nút mở không.</li>
+      <li>Nút xác nhận nên là động từ cụ thể ("Xóa", "Đăng xuất") thay vì "OK"; đừng dùng dialog cho thông tin không cần quyết định — Snackbar nhẹ nhàng hơn.</li>
+      <li>Dialog phức tạp (có màn hình riêng, cần mở từ deep link) có thể khai báo thành một đích (destination) dạng dialog trong Navigation — xem <a href="#navigation">Navigation</a>.</li>
+    </ul>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/components/dialog" target="_blank" rel="noopener">Dialog</a>, <a href="https://developer.android.com/develop/ui/compose/components/bottom-sheets" target="_blank" rel="noopener">Bottom sheets</a>, <a href="https://developer.android.com/develop/ui/compose/components/menu" target="_blank" rel="noopener">Menus</a></p>
+</section>

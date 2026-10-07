@@ -1,0 +1,221 @@
+<section class="topic" id="material3" data-title="Material 3">
+  <h2>Material Design 3 và MaterialTheme</h2>
+  <p class="lead">Material Design 3 là bộ quy tắc thiết kế mà các component trong Compose tuân theo. <code>MaterialTheme</code> là nơi bạn khai báo màu, kiểu chữ và hình dạng một lần để cả app dùng chung, nên giao diện đồng nhất và tự hỗ trợ chế độ tối.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p><strong>Material Design</strong> là hệ thống thiết kế (design system) do Google xây dựng, gồm hướng dẫn trình bày, bộ component có sẵn và một tập <strong>design token</strong>. Token là các giá trị được đặt tên theo vai trò, ví dụ "màu chính", "chữ tiêu đề lớn", "bo góc vừa", thay cho các con số cụ thể. Phiên bản thứ ba (Material 3, có lúc được gọi là Material You) bổ sung màu động lấy từ hình nền của người dùng, cùng một bảng vai trò màu chi tiết hơn.</p>
+    <p>Compose cung cấp Material 3 qua thư viện <code>androidx.compose.material3</code>. Các component như <code>Button</code>, <code>Card</code>, <code>TopAppBar</code> đều đọc token từ <code>MaterialTheme</code>. Vì vậy chỉ cần đổi theme là cả app đổi theo. Với View/XML, bạn khai báo theme trong <code>themes.xml</code> và tham chiếu bằng <code>?attr/colorPrimary</code>. Trong Compose, theme là một hàm composable bao quanh giao diện, và bạn đọc token bằng <code>MaterialTheme.colorScheme</code>, <code>MaterialTheme.typography</code>, <code>MaterialTheme.shapes</code>.</p>
+    <p>Khi tạo dự án mới bằng mẫu "Empty Activity", Android Studio sinh sẵn thư mục <code>ui/theme</code> gồm ba file: <code>Color.kt</code> (các hằng màu), <code>Type.kt</code> (đối tượng <code>Typography</code>) và <code>Theme.kt</code> (hàm theme của app, đặt tên theo dự án, ví dụ <code>MyShopTheme</code>, bên trong gọi <code>MaterialTheme</code>). <code>MainActivity</code> bọc toàn bộ giao diện trong hàm theme đó.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>1. Bọc giao diện trong MaterialTheme</h4>
+    <p><code>MaterialTheme</code> nhận ba nhóm token. Mọi composable nằm bên trong đều đọc được chúng.</p>
+    <pre><code class="language-kotlin">@Composable
+fun AppTheme(content: @Composable () -&gt; Unit) {
+    MaterialTheme(
+        colorScheme = lightColorScheme(),  // bảng màu (ColorScheme)
+        typography = Typography(),         // thang chữ
+        shapes = Shapes(),                 // bộ bo góc
+        content = content
+    )
+}
+
+// Trong MainActivity
+setContent {
+    AppTheme {
+        HomeScreen()
+    }
+}</code></pre>
+    <p>Gọi <code>lightColorScheme()</code>, <code>Typography()</code>, <code>Shapes()</code> mà không truyền tham số thì bạn được giá trị mặc định của Material 3, với tông tím đặc trưng. Cách thay bằng màu thương hiệu, font riêng và chế độ tối được trình bày ở <a href="#custom-theme">Tùy biến theme</a>.</p>
+
+    <h4>2. Đọc token trong composable</h4>
+    <pre><code class="language-kotlin">Text(
+    text = "Khuyến mãi hôm nay",
+    color = MaterialTheme.colorScheme.primary,
+    style = MaterialTheme.typography.headlineSmall
+)
+Box(
+    Modifier
+        .size(56.dp)
+        .clip(MaterialTheme.shapes.medium)
+        .background(MaterialTheme.colorScheme.secondaryContainer)
+)</code></pre>
+
+    <h4>3. Các vai trò màu</h4>
+    <p>Màu nào cũng có cặp <code>on…</code> đi kèm. Đó là màu dành cho chữ và icon đặt <em>trên</em> nền màu đó, và cặp này luôn được thiết kế đủ độ tương phản.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Vai trò</th><th>Ý nghĩa và chỗ dùng</th></tr></thead>
+      <tbody>
+        <tr><td><code>primary</code> / <code>onPrimary</code></td><td>Màu chủ đạo, dành cho phần tử quan trọng nhất như nút chính (<code>Button</code>) và trạng thái đang chọn.</td></tr>
+        <tr><td><code>primaryContainer</code> / <code>onPrimaryContainer</code></td><td>Nền nhạt hơn, nổi bật vừa phải: thẻ thông báo, FAB, khối cần chú ý.</td></tr>
+        <tr><td><code>secondary</code>, <code>secondaryContainer</code> (+ <code>on…</code>)</td><td>Phần tử phụ, ít nổi bật hơn: chip lọc, nút tonal, viên thuốc đánh dấu tab đang chọn.</td></tr>
+        <tr><td><code>tertiary</code>, <code>tertiaryContainer</code> (+ <code>on…</code>)</td><td>Màu nhấn tương phản để cân bằng bảng màu hoặc làm nổi một chi tiết riêng, ví dụ huy hiệu, ô nhập đặc biệt.</td></tr>
+        <tr><td><code>surface</code> / <code>onSurface</code></td><td>Nền của card, sheet, menu. <code>onSurface</code> là màu chữ chính.</td></tr>
+        <tr><td><code>surfaceVariant</code> / <code>onSurfaceVariant</code></td><td>Nền phân biệt nhẹ. <code>onSurfaceVariant</code> hay dùng cho chữ phụ, chú thích, icon không nhấn mạnh.</td></tr>
+        <tr><td><code>surfaceContainerLowest</code>, <code>…Low</code>, <code>surfaceContainer</code>, <code>…High</code>, <code>…Highest</code></td><td>Năm mức nền container. Mức càng cao thì càng tách khỏi nền màn hình: ở chế độ sáng nó tối dần, ở chế độ tối nó sáng dần. Dùng chúng để tách lớp: thanh điều hướng, card, dialog, bottom sheet đặt trên các mức khác nhau. Material 3 dùng các mức này thay cho bóng đổ.</td></tr>
+        <tr><td><code>background</code> / <code>onBackground</code></td><td>Nền phía sau toàn màn hình. Trong Material 3, màu này thường trùng với <code>surface</code>.</td></tr>
+        <tr><td><code>error</code>, <code>errorContainer</code> (+ <code>on…</code>)</td><td>Báo lỗi: viền ô nhập sai, thông báo thất bại, nút xóa nguy hiểm.</td></tr>
+        <tr><td><code>outline</code></td><td>Viền có ý nghĩa, ví dụ viền <code>OutlinedTextField</code> hay <code>OutlinedButton</code>.</td></tr>
+        <tr><td><code>outlineVariant</code></td><td>Viền trang trí, mờ hơn: đường kẻ phân cách (<code>HorizontalDivider</code>).</td></tr>
+        <tr><td><code>inverseSurface</code> / <code>inverseOnSurface</code></td><td>Nền đảo ngược, nổi trên mọi thứ khác, ví dụ <code>Snackbar</code>.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h4>4. Thang chữ (type scale)</h4>
+    <p>Có 5 nhóm, mỗi nhóm có 3 cỡ <code>Large</code>, <code>Medium</code>, <code>Small</code>, tổng cộng 15 kiểu. Bảng dưới ghi cỡ chữ mặc định tính bằng sp.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Nhóm</th><th>Large / Medium / Small</th><th>Khi nào dùng</th></tr></thead>
+      <tbody>
+        <tr><td><code>display</code></td><td>57 / 45 / 36</td><td>Chữ rất lớn, ngắn: con số nổi bật, màn chào mừng.</td></tr>
+        <tr><td><code>headline</code></td><td>32 / 28 / 24</td><td>Tiêu đề của màn hình hoặc của một phần lớn.</td></tr>
+        <tr><td><code>title</code></td><td>22 / 16 / 14</td><td>Tiêu đề của card, mục danh sách, thanh trên cùng.</td></tr>
+        <tr><td><code>body</code></td><td>16 / 14 / 12</td><td>Đoạn văn, mô tả, nội dung chính. <code>Text</code> mặc định dùng <code>bodyLarge</code>.</td></tr>
+        <tr><td><code>label</code></td><td>14 / 12 / 11</td><td>Chữ trên nút, chip, tab, chú thích nhỏ. Nút dùng <code>labelLarge</code>.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h4>5. Hình dạng (shapes)</h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Token</th><th>Bo góc mặc định</th><th>Ví dụ component</th></tr></thead>
+      <tbody>
+        <tr><td><code>extraSmall</code></td><td>4.dp</td><td>Chi tiết rất nhỏ, tooltip</td></tr>
+        <tr><td><code>small</code></td><td>8.dp</td><td>Chip, ô nhỏ</td></tr>
+        <tr><td><code>medium</code></td><td>12.dp</td><td><code>Card</code></td></tr>
+        <tr><td><code>large</code></td><td>16.dp</td><td><code>FloatingActionButton</code></td></tr>
+        <tr><td><code>extraLarge</code></td><td>28.dp</td><td><code>AlertDialog</code>, phần đầu bottom sheet</td></tr>
+      </tbody>
+    </table></div>
+
+    <h4>6. Surface và màu nội dung</h4>
+    <ul>
+      <li><code>Surface(color, contentColor, shape, tonalElevation, border)</code> vẽ một nền có hình dạng, đồng thời đặt <strong>màu nội dung</strong> (<code>LocalContentColor</code>) cho mọi thứ bên trong.</li>
+      <li>Khi không chỉ định <code>color</code>, <code>Text</code> và <code>Icon</code> sẽ lấy màu từ <code>LocalContentColor.current</code>. Nhờ vậy chữ đặt trong <code>Surface(color = primaryContainer)</code> tự có màu <code>onPrimaryContainer</code>.</li>
+      <li>Hàm <code>contentColorFor(nền)</code> trả về màu <code>on…</code> tương ứng với một màu có trong theme. <code>Surface</code> đã dùng hàm này làm giá trị mặc định cho <code>contentColor</code>.</li>
+    </ul>
+
+    <h4>7. Vì sao dùng token thay cho mã màu cứng</h4>
+    <ul>
+      <li><strong>Chế độ tối miễn phí:</strong> <code>colorScheme.onSurface</code> tự đổi từ gần đen sang gần trắng, còn <code>Color(0xFF000000)</code> thì giữ nguyên và chữ sẽ biến mất trên nền tối.</li>
+      <li><strong>Màu động:</strong> trên Android 12 trở lên, bảng màu có thể lấy theo hình nền. Chỉ những chỗ dùng token mới đổi theo.</li>
+      <li><strong>Dễ đổi thương hiệu:</strong> đổi một chỗ trong theme là cả app đổi theo, không phải đi tìm từng mã hex.</li>
+    </ul>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>Ví dụ 1: Xem nhanh thang chữ</h4>
+    <pre><code class="language-kotlin">@Composable
+fun TypeScaleSample() {
+    val samples = listOf(
+        "displaySmall" to MaterialTheme.typography.displaySmall,
+        "headlineMedium" to MaterialTheme.typography.headlineMedium,
+        "titleLarge" to MaterialTheme.typography.titleLarge,
+        "bodyLarge" to MaterialTheme.typography.bodyLarge,
+        "labelMedium" to MaterialTheme.typography.labelMedium,
+    )
+    Column(
+        modifier = Modifier.padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        samples.forEach { (name, style) -&gt;
+            Text(text = name, style = style)
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Năm dòng chữ xếp theo cỡ giảm dần, từ "displaySmall" to nhất đến "labelMedium" nhỏ nhất. Đây là cách nhanh để xem font của theme trông ra sao trong Preview.</p>
+
+    <h4>Ví dụ 2: Thẻ sản phẩm chỉ dùng token</h4>
+    <pre><code class="language-kotlin">@Composable
+fun ProductRow(name: String, description: String, price: String, modifier: Modifier = Modifier) {
+    Card(modifier = modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            Text(text = name, style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = price,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Một thẻ bo góc 12.dp (do <code>Card</code> dùng <code>shapes.medium</code>) gồm tên sản phẩm đậm vừa, mô tả màu xám dịu và giá màu chủ đạo. Bật chế độ tối thì mọi màu tự đổi theo mà bạn không phải sửa code.</p>
+
+    <h4>Ví dụ 3: Thẻ thông báo với Surface và màu container</h4>
+    <pre><code class="language-kotlin">enum class NoticeType { INFO, ERROR }
+
+@Composable
+fun NoticeCard(
+    type: NoticeType,
+    title: String,
+    message: String,
+    modifier: Modifier = Modifier
+) {
+    val container = when (type) {
+        NoticeType.INFO -&gt; MaterialTheme.colorScheme.primaryContainer
+        NoticeType.ERROR -&gt; MaterialTheme.colorScheme.errorContainer
+    }
+    Surface(
+        color = container,
+        contentColor = contentColorFor(container), // onPrimaryContainer hoặc onErrorContainer
+        shape = MaterialTheme.shapes.medium,
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                painter = painterResource(
+                    if (type == NoticeType.INFO) R.drawable.ic_info else R.drawable.ic_error
+                ),
+                contentDescription = null // màu lấy từ LocalContentColor
+            )
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(title, style = MaterialTheme.typography.titleSmall)
+                Text(message, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun NoticeCardPreview() {
+    AppTheme {
+        Surface {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                NoticeCard(NoticeType.INFO, "Đã lưu", "Ghi chú được đồng bộ lúc 9:41.")
+                NoticeCard(NoticeType.ERROR, "Không gửi được", "Kiểm tra kết nối mạng rồi thử lại.")
+            }
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Preview hiện hai phiên bản Sáng và Tối. Thẻ "Đã lưu" có nền tông chủ đạo nhạt và chữ đậm cùng tông. Thẻ "Không gửi được" có nền đỏ nhạt và chữ đỏ sẫm. Không chỗ nào khai báo màu chữ, tất cả đều lấy từ <code>Surface</code>.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li><strong>Không trộn Material 2 và Material 3:</strong> <code>androidx.compose.material.Text</code> (M2) khác <code>androidx.compose.material3.Text</code> (M3). Component M2 đọc theme M2, nên đặt trong <code>MaterialTheme</code> của M3 sẽ ra sai màu. Hãy kiểm tra kỹ dòng import.</li>
+      <li><strong>Ghép đúng cặp màu:</strong> chữ đặt trên <code>primaryContainer</code> phải dùng <code>onPrimaryContainer</code>, không dùng <code>onPrimary</code>. Ghép sai cặp thường ra chữ khó đọc, nhất là ở chế độ tối.</li>
+      <li><strong>Preview cũng cần theme:</strong> nếu không bọc trong hàm theme của app, Preview sẽ hiện màu tím mặc định và font hệ thống, khác với lúc chạy thật.</li>
+      <li><code>MaterialTheme.colorScheme</code>, <code>typography</code>, <code>shapes</code> là getter <code>@Composable</code>, chỉ đọc được trong hàm composable. Đừng cố đọc chúng trong ViewModel hay hàm thường.</li>
+      <li>Muốn chỉnh một chi tiết của kiểu chữ, hãy dựa trên token: <code>MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)</code>. Cách này tốt hơn tự đặt <code>fontSize = 17.sp</code> rời rạc.</li>
+      <li>Material 3 phân lớp chủ yếu bằng <strong>màu nền</strong> (<code>surfaceContainer…</code>, <code>tonalElevation</code>) thay vì bóng đổ đậm. Hãy chọn mức container phù hợp trước khi nghĩ đến <code>shadowElevation</code>.</li>
+    </ul>
+    <div class="callout tip"><strong>Mẹo:</strong> Gặp một vai trò màu lạ, hãy tự hỏi phần tử đó cần nổi bật đến mức nào. Rất nổi bật thì dùng <code>primary</code>, nổi vừa thì dùng <code>…Container</code>, nền bình thường thì dùng <code>surface…</code>, chữ phụ thì dùng <code>onSurfaceVariant</code>.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/designsystems/material3?hl=vi" target="_blank" rel="noopener">Material Design 3 trong Compose</a></p>
+</section>

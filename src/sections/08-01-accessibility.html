@@ -1,0 +1,199 @@
+<section class="topic" id="accessibility" data-title="Hỗ trợ tiếp cận">
+  <h2>Hỗ trợ tiếp cận (Accessibility)</h2>
+  <p class="lead">Hỗ trợ tiếp cận là làm cho ứng dụng dùng được với <em>mọi</em> người: người khiếm thị dùng trình đọc màn hình, người khó cử động tay, người cần chữ to. Compose làm sẵn phần lớn việc này; bạn chỉ cần cung cấp đúng thông tin ở những chỗ nó không tự đoán được.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p>Rất nhiều người dùng không tương tác với điện thoại bằng mắt và ngón tay theo cách thông thường. <strong>TalkBack</strong> là trình đọc màn hình của Android: nó đọc to nội dung, người dùng vuốt để chuyển giữa các phần tử và nhấn đúp để kích hoạt. <strong>Switch Access</strong> (truy cập bằng công tắc) cho phép điều khiển máy bằng một vài nút bấm vật lý. Người nhìn kém thì phóng to chữ, tăng độ tương phản. Làm tốt hỗ trợ tiếp cận vừa mở rộng số người dùng được app, vừa đáp ứng yêu cầu pháp lý ở nhiều thị trường; báo cáo trước khi ra mắt (pre-launch report) trên Google Play Console cũng chỉ ra các lỗi tiếp cận phổ biến.</p>
+    <p>Song song với cây giao diện, Compose dựng một <strong>cây ngữ nghĩa</strong> (semantics tree): mỗi nút trong cây mô tả <em>ý nghĩa</em> của một phần tử — nhãn ("Chia sẻ bài viết"), vai trò (nút, công tắc, tiêu đề), trạng thái ("đã bật"), hành động có thể làm (bấm, cuộn). TalkBack, Switch Access, tính năng tự điền và cả công cụ kiểm thử đều đọc cây này chứ không "nhìn" pixel. Component Material (<code>Button</code>, <code>Checkbox</code>, <code>Switch</code>…) và modifier như <code>clickable</code> đã tự điền semantics; việc của bạn là bổ sung cho những gì Compose không tự biết, như ý nghĩa của một icon hay một hình vẽ trên <a href="#graphics">Canvas</a>.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>1. <code>contentDescription</code> cho ảnh và icon</h4>
+    <ul>
+      <li><code>Image</code> và <code>Icon</code> <strong>bắt buộc</strong> truyền tham số này để bạn phải suy nghĩ. Icon/ảnh mang ý nghĩa (nút chỉ có icon, ảnh sản phẩm): viết mô tả ngắn, nói <em>hành động hoặc nội dung</em> — "Chia sẻ bài viết", không phải "mũi tên cong".</li>
+      <li>Ảnh/icon chỉ để trang trí hoặc lặp lại ý của chữ bên cạnh: truyền <code>null</code> để TalkBack bỏ qua.</li>
+      <li>Không thêm chữ "nút", "hình ảnh", "biểu tượng" vào mô tả: TalkBack đã tự đọc vai trò, thêm vào sẽ thành "Nút chia sẻ, Nút".</li>
+      <li>Lấy chuỗi từ <code>stringResource(…)</code> để mô tả cũng được dịch như phần còn lại của app.</li>
+    </ul>
+
+    <h4>2. <code>Modifier.semantics</code>: bổ sung thông tin</h4>
+    <pre><code class="language-kotlin">Text(
+    "Bài viết mới",
+    style = MaterialTheme.typography.titleLarge,
+    modifier = Modifier.semantics { heading() }   // TalkBack cho phép nhảy giữa các tiêu đề
+)
+
+Box(
+    Modifier
+        .size(56.dp)
+        .clickable(onClick = onDoiCheDo)
+        .semantics {
+            contentDescription = "Chế độ tối"
+            stateDescription = if (dangBat) "Đang bật" else "Đang tắt"
+            role = Role.Button
+        }
+)</code></pre>
+    <p><code>stateDescription</code> mô tả trạng thái hiện tại bằng lời của bạn; <code>role</code> (<code>Role.Button</code>, <code>Role.Checkbox</code>, <code>Role.Switch</code>, <code>Role.Tab</code>, <code>Role.Image</code>…) cho biết phần tử là loại gì. Nếu là phần tử bấm được, có thể truyền <code>onClickLabel</code> vào <code>clickable</code> để TalkBack đọc "Nhấn đúp để <em>mở bài viết</em>" thay vì "Nhấn đúp để kích hoạt".</p>
+
+    <h4>3. Gộp và thay thế nội dung</h4>
+    <ul>
+      <li><code>Modifier.semantics(mergeDescendants = true) { }</code>: gộp các phần tử con thành <strong>một</strong> điểm dừng của TalkBack, đọc liền mạch. <code>clickable</code>, <code>toggleable</code> tự gộp như vậy.</li>
+      <li><code>Modifier.clearAndSetSemantics { }</code>: xóa hết semantics của con, thay bằng mô tả bạn tự đặt — dùng khi cách đọc từng phần tử con gây khó hiểu.</li>
+    </ul>
+    <pre><code class="language-kotlin">// Các icon R.drawable.ic_* là Material Symbols XML tải từ Google Fonts (tên giả định)
+// Đọc: "Nguyễn Văn An, Quản trị viên" trong một lần dừng
+Row(Modifier.semantics(mergeDescendants = true) { }) {
+    Icon(painterResource(R.drawable.ic_person), contentDescription = null)
+    Column {
+        Text("Nguyễn Văn An")
+        Text("Quản trị viên")
+    }
+}
+
+// Năm icon sao được thay bằng một câu duy nhất
+Row(Modifier.clearAndSetSemantics { contentDescription = "Đánh giá 4 trên 5 sao" }) {
+    repeat(5) { i -&gt;
+        Icon(painterResource(R.drawable.ic_star), contentDescription = null, tint = if (i &lt; 4) Color(0xFFFFB300) else Color.LightGray)
+    }
+}</code></pre>
+
+    <h4>4. Vùng chạm tối thiểu 48dp</h4>
+    <p>Mọi phần tử bấm được nên có vùng chạm ít nhất <strong>48 × 48dp</strong>, kể cả khi hình nhìn thấy nhỏ hơn. Component Material (<code>IconButton</code>, <code>Checkbox</code>, <code>RadioButton</code>…) tự đảm bảo nhờ <code>Modifier.minimumInteractiveComponentSize()</code>. Tự làm phần tử bấm được thì ưu tiên dùng lại <code>IconButton</code>; nếu không, thêm modifier này trước <code>clickable</code> hoặc dùng <code>sizeIn(minWidth = 48.dp, minHeight = 48.dp)</code>.</p>
+
+    <h4>5. Hàng chọn: <code>toggleable</code> và <code>selectable</code></h4>
+    <p>Với hàng "chữ + công tắc/ô chọn", hãy cho <strong>cả hàng</strong> bấm được bằng <code>Modifier.toggleable(value, onValueChange, role = Role.Switch)</code> và truyền <code>onCheckedChange = null</code> cho <code>Switch</code>/<code>Checkbox</code> bên trong. Cả hàng thành một phần tử lớn, dễ chạm, TalkBack đọc đủ nhãn kèm trạng thái. Nhóm lựa chọn một-trong-nhiều dùng <code>Modifier.selectable(selected, onClick, role = Role.RadioButton)</code> cho từng hàng và <code>Modifier.selectableGroup()</code> cho khối cha.</p>
+
+    <h4>6. Cỡ chữ, tương phản, thứ tự đọc, hành động tùy chỉnh</h4>
+    <ul>
+      <li><strong>Cỡ chữ</strong>: luôn dùng <code>sp</code> (typography của Material đã đúng). Không cố định chiều cao vùng chứa chữ — dùng <code>heightIn(min = …)</code> thay cho <code>height(…)</code>. Android 14 trở lên cho phép phóng chữ tới 200%; kiểm tra bằng <code>@Preview(fontScale = 2f)</code>.</li>
+      <li><strong>Tương phản</strong>: chữ thường cần tỉ lệ tương phản tối thiểu 4.5:1 với nền, chữ cỡ lớn và icon/viền điều khiển tối thiểu 3:1 (theo WCAG). Dùng cặp màu vai trò của <a href="#material3">Material 3</a> (<code>primary</code>/<code>onPrimary</code>, <code>surface</code>/<code>onSurface</code>) để có sẵn tương phản tốt. Đừng truyền tải thông tin chỉ bằng màu.</li>
+      <li><strong>Thứ tự đọc</strong>: TalkBack đọc từ trên xuống, trái sang phải. Đặt <code>Modifier.semantics { isTraversalGroup = true }</code> lên một khối để đọc hết khối đó rồi mới sang khối khác; trong cùng nhóm, <code>traversalIndex</code> nhỏ hơn được đọc trước (mặc định <code>0f</code>).</li>
+      <li><strong>Hành động tùy chỉnh</strong>: <code>semantics { customActions = listOf(CustomAccessibilityAction("Xóa") { xoa(); true }) }</code> đưa các thao tác phụ (vuốt xóa, nhấn giữ) vào menu hành động của TalkBack và Switch Access.</li>
+    </ul>
+
+    <h4>7. Kiểm tra</h4>
+    <ul>
+      <li><strong>TalkBack</strong>: bật trong Cài đặt &gt; Hỗ trợ tiếp cận, nhắm mắt thử hoàn thành các luồng chính.</li>
+      <li><strong>Accessibility Scanner</strong>: ứng dụng của Google, quét màn hình và gợi ý vùng chạm nhỏ, tương phản thấp, thiếu nhãn.</li>
+      <li><strong>Layout Inspector</strong> trong Android Studio: chọn một composable để xem các thuộc tính semantics của nó.</li>
+      <li><strong>Kiểm thử tự động</strong>: tìm phần tử bằng <code>onNodeWithContentDescription(…)</code>, in cây ngữ nghĩa bằng <code>printToLog</code> (xem <a href="#testing">Kiểm thử</a>).</li>
+    </ul>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Mục kiểm tra nhanh</th><th>Đạt khi</th></tr></thead>
+      <tbody>
+        <tr><td>Nhãn</td><td>Mọi nút chỉ có icon đều có <code>contentDescription</code>; ảnh trang trí là <code>null</code></td></tr>
+        <tr><td>Vùng chạm</td><td>Phần tử bấm được rộng/cao tối thiểu 48dp</td></tr>
+        <tr><td>Cỡ chữ</td><td>Ở <code>fontScale = 2f</code> không có chữ bị cắt, chồng lên nhau</td></tr>
+        <tr><td>Tương phản</td><td>Chữ thường ≥ 4.5:1, chữ lớn và icon ≥ 3:1</td></tr>
+        <tr><td>Nhóm nội dung</td><td>Một thẻ/hàng được đọc trọn trong một lần dừng</td></tr>
+        <tr><td>Trạng thái</td><td>Bật/tắt, đã chọn, đã lưu được đọc ra, không chỉ thể hiện bằng màu</td></tr>
+        <tr><td>Cử chỉ</td><td>Mọi cử chỉ đặc biệt (vuốt, nhấn giữ, kéo) có cách thay thế</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>Ví dụ 1: Nút icon có mô tả và icon trang trí</h4>
+    <pre><code class="language-kotlin">@Composable
+fun HangHanhDong(soBinhLuan: Int, onChiaSe: () -&gt; Unit, onBinhLuan: () -&gt; Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        // Nút chỉ có icon: bắt buộc mô tả hành động
+        IconButton(onClick = onChiaSe) {
+            Icon(painterResource(R.drawable.ic_share), contentDescription = "Chia sẻ bài viết")
+        }
+        // Icon đi kèm chữ: chữ đã đủ nghĩa, icon chỉ trang trí
+        TextButton(onClick = onBinhLuan) {
+            Icon(painterResource(R.drawable.ic_add), contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text("Bình luận ($soBinhLuan)")
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Trên màn hình là icon chia sẻ và nút "+ Bình luận (12)". Khi bật TalkBack, lần lượt nghe "Chia sẻ bài viết" rồi "Bình luận (12)", mỗi lần kèm vai trò nút — icon dấu cộng không bị đọc thừa.</p>
+
+    <h4>Ví dụ 2: Hàng cài đặt bấm được cả hàng</h4>
+    <pre><code class="language-kotlin">@Composable
+fun HangCaiDat(tieuDe: String, dangBat: Boolean, onDoi: (Boolean) -&gt; Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .toggleable(value = dangBat, onValueChange = onDoi, role = Role.Switch)
+            .heightIn(min = 56.dp)
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(tieuDe, Modifier.weight(1f).padding(vertical = 8.dp))
+        Switch(checked = dangBat, onCheckedChange = null)   // hàng đã xử lý chạm
+    }
+}
+
+@Preview(showBackground = true, fontScale = 2f)
+@Composable
+fun HangCaiDatChuToPreview() {
+    var thongBao by remember { mutableStateOf(true) }
+    HangCaiDat("Nhận thông báo khi có bài viết mới", thongBao) { thongBao = it }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Chạm bất kỳ đâu trên hàng đều bật/tắt công tắc. TalkBack dừng một lần ở cả hàng, đọc tiêu đề kèm trạng thái bật/tắt và vai trò công tắc. Ở preview cỡ chữ 200%, tiêu đề xuống dòng và hàng tự cao lên thay vì bị cắt.</p>
+
+    <h4>Ví dụ 3: Thẻ bài viết gộp nội dung, có trạng thái "Đã lưu"</h4>
+    <pre><code class="language-kotlin">@Composable
+fun TheBaiViet(
+    tieuDe: String,
+    tacGia: String,
+    soPhutDoc: Int,
+    daLuu: Boolean,
+    onMo: () -&gt; Unit,
+    onDoiLuu: () -&gt; Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                // clickable tự gộp các Text con thành một điểm dừng
+                .clickable(onClickLabel = "đọc bài viết", onClick = onMo)
+                .semantics {
+                    stateDescription = if (daLuu) "Đã lưu" else "Chưa lưu"
+                    customActions = listOf(
+                        CustomAccessibilityAction(if (daLuu) "Bỏ lưu" else "Lưu bài viết") {
+                            onDoiLuu()
+                            true
+                        }
+                    )
+                }
+                .padding(start = 16.dp, top = 12.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(tieuDe, style = MaterialTheme.typography.titleMedium)
+                Text("$tacGia · $soPhutDoc phút đọc", style = MaterialTheme.typography.bodySmall)
+            }
+            IconButton(onClick = onDoiLuu) {
+                Icon(
+                    painter = painterResource(if (daLuu) R.drawable.ic_favorite_filled else R.drawable.ic_favorite),
+                    contentDescription = if (daLuu) "Bỏ lưu" else "Lưu bài viết"
+                )
+            }
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Một thẻ có tiêu đề, dòng tác giả và nút trái tim bên phải. TalkBack dừng ở thẻ và đọc liền tiêu đề, dòng tác giả, "Đã lưu", rồi gợi ý "Nhấn đúp để đọc bài viết" kèm thông báo có hành động; vuốt tiếp sẽ đến nút "Bỏ lưu". Người dùng cũng có thể bỏ lưu ngay từ menu hành động của TalkBack mà không cần tìm nút.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li><strong>Đừng mô tả hình dáng</strong> ("icon trái tim", "nút X") mà mô tả ý nghĩa ("Lưu bài viết", "Đóng"). Mô tả nên ngắn, bắt đầu bằng từ quan trọng nhất.</li>
+      <li><strong>Đừng dùng <code>clearAndSetSemantics</code> trên vùng chứa nút bấm</strong> mà không bù lại bằng <code>customActions</code>: các nút con sẽ biến mất với TalkBack.</li>
+      <li><strong>Cố định chiều cao là thủ phạm số một</strong> làm chữ bị cắt khi người dùng phóng to chữ. Hãy dùng <code>heightIn(min = …)</code> và cho phép xuống dòng.</li>
+      <li><strong>Cử chỉ tự viết bằng <code>pointerInput</code></strong> (nhấn đúp để thích, vuốt để xóa) không có semantics — luôn kèm một nút hoặc hành động tùy chỉnh (xem <a href="#gestures">Cử chỉ &amp; cuộn</a>).</li>
+      <li><strong>Animation và nhấp nháy</strong>: không để thông tin chỉ xuất hiện trong một hiệu ứng thoáng qua; tôn trọng tùy chọn giảm chuyển động (xem <a href="#animation-nang-cao">Animation nâng cao</a>).</li>
+      <li><strong>Thông báo thay đổi quan trọng</strong> như lỗi biểu mẫu nên hiện thành chữ gần trường nhập (ví dụ tham số <code>supportingText</code>, <code>isError</code> của <code>TextField</code>), không chỉ đổi viền sang màu đỏ.</li>
+    </ul>
+    <div class="callout tip"><strong>Mẹo:</strong> Thói quen hiệu quả nhất: mỗi khi xong một màn hình, bật TalkBack và thử dùng nó trong 2 phút mà không nhìn. Bạn sẽ phát hiện ngay chỗ thiếu nhãn, đọc sai thứ tự hay phải vuốt quá nhiều lần.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/accessibility?hl=vi" target="_blank" rel="noopener">Hỗ trợ tiếp cận trong Compose</a></p>
+</section>

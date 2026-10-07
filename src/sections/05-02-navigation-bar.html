@@ -1,0 +1,303 @@
+<section class="topic" id="navigation-bar" data-title="Thanh điều hướng">
+  <h2>Thanh điều hướng, NavigationRail và Drawer</h2>
+  <p class="lead">Đây là các thành phần giúp người dùng chuyển nhanh giữa những khu vực chính của app như Trang chủ, Tìm kiếm, Hồ sơ. Chọn đúng mẫu điều hướng cho từng kích thước màn hình giúp app dễ dùng trên cả điện thoại lẫn tablet.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p><strong>Điều hướng cấp cao</strong> (top-level navigation) là việc chuyển qua lại giữa các khu vực chính, ngang hàng nhau của app. Nó khác với kiểu điều hướng "đi sâu", ví dụ bấm vào một sản phẩm để xem chi tiết rồi bấm Back để quay lại. Người dùng luôn mở được một đích cấp cao trực tiếp từ một thanh hoặc menu cố định, dù đang ở màn nào.</p>
+    <p>Material 3 có sẵn ba nhóm composable cho việc này: <code>NavigationBar</code> (thanh nằm ở đáy màn hình), <code>NavigationRail</code> (cột dọc hẹp ở cạnh trái) và <strong>Navigation Drawer</strong> (ngăn kéo trượt ra từ cạnh trái: <code>ModalNavigationDrawer</code>, <code>DismissibleNavigationDrawer</code>, <code>PermanentNavigationDrawer</code>). Hồi còn dùng View/XML, bạn phải kết hợp <code>BottomNavigationView</code>, <code>NavigationRailView</code>, <code>DrawerLayout</code> với một file menu XML. Trong Compose, mỗi mục chỉ là một lời gọi hàm nằm trong vòng lặp <code>forEach</code>.</p>
+    <p>Các composable này <em>chỉ lo phần hiển thị</em> và báo cho bạn biết khi người dùng bấm. Chúng không tự đổi màn hình. Bạn tự viết phần đổi màn hình, thường bằng cách gọi <code>navController.navigate(...)</code> của Navigation Compose (xem <a href="#navigation">Navigation Compose</a>). Ngoài ra còn có <code>NavigationSuiteScaffold</code>, một bộ khung tự chọn thanh dưới, rail hoặc drawer dựa trên kích thước cửa sổ.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>1. Chọn mẫu điều hướng</h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Mẫu</th><th>Phù hợp khi</th><th>Số đích</th><th>Composable</th></tr></thead>
+      <tbody>
+        <tr><td>Thanh điều hướng dưới</td><td>Điện thoại cầm dọc (cửa sổ hẹp)</td><td>3–5</td><td><code>NavigationBar</code> + <code>NavigationBarItem</code></td></tr>
+        <tr><td>Navigation rail</td><td>Tablet, điện thoại xoay ngang, máy gập khi mở ra</td><td>3–7</td><td><code>NavigationRail</code> + <code>NavigationRailItem</code></td></tr>
+        <tr><td>Drawer dạng modal</td><td>App có nhiều đích hoặc có đích ít dùng. Drawer ẩn sẵn, người dùng mở bằng nút menu hoặc vuốt từ cạnh trái</td><td>Nhiều</td><td><code>ModalNavigationDrawer</code> + <code>ModalDrawerSheet</code> + <code>NavigationDrawerItem</code></td></tr>
+        <tr><td>Drawer cố định</td><td>Màn hình rất rộng (tablet lớn, desktop), luôn hiển thị</td><td>Nhiều</td><td><code>PermanentNavigationDrawer</code> + <code>PermanentDrawerSheet</code></td></tr>
+        <tr><td>Tự thích ứng</td><td>Một app chạy trên nhiều kích thước màn hình</td><td>3–5</td><td><code>NavigationSuiteScaffold</code></td></tr>
+      </tbody>
+    </table></div>
+
+    <h4>2. Khai báo danh sách đích cấp cao</h4>
+    <p>Gom thông tin của mỗi tab (route, nhãn, icon) vào một <code>enum class</code> hoặc <code>data class</code>. Nhờ vậy thanh dưới, rail và drawer có thể dùng chung một danh sách, và khi thêm tab mới bạn chỉ phải sửa ở một chỗ.</p>
+    <pre><code class="language-kotlin">@Serializable object HomeRoute
+@Serializable object SearchRoute
+@Serializable object ProfileRoute
+
+enum class TopLevelDestination(
+    val route: Any,
+    val label: String,
+    @DrawableRes val icon: Int,
+) {
+    HOME(HomeRoute, "Trang chủ", R.drawable.ic_home),
+    SEARCH(SearchRoute, "Tìm kiếm", R.drawable.ic_search),
+    PROFILE(ProfileRoute, "Hồ sơ", R.drawable.ic_person),
+}</code></pre>
+
+    <h4>3. Đặt NavigationBar vào Scaffold</h4>
+    <p>Truyền <code>NavigationBar</code> vào tham số <code>bottomBar</code> của <code>Scaffold</code> (xem <a href="#scaffold">Scaffold</a>). Bên trong, gọi <code>NavigationBarItem</code> một lần cho mỗi đích. Các tham số chính:</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Tham số</th><th>Ý nghĩa</th></tr></thead>
+      <tbody>
+        <tr><td><code>selected</code></td><td>Mục này có đang được chọn không. Mục đang chọn có một nền hình viên thuốc (indicator) phía sau icon.</td></tr>
+        <tr><td><code>onClick</code></td><td>Lambda chạy khi người dùng bấm, thường là nơi gọi <code>navigate</code>.</td></tr>
+        <tr><td><code>icon</code></td><td>Composable vẽ icon, ví dụ <code>{ Icon(painterResource(...), null) }</code>.</td></tr>
+        <tr><td><code>label</code></td><td>Nhãn chữ bên dưới icon. Không bắt buộc nhưng nên có.</td></tr>
+        <tr><td><code>alwaysShowLabel</code></td><td>Mặc định là <code>true</code>. Đặt <code>false</code> nếu chỉ muốn mục đang chọn hiện nhãn.</td></tr>
+        <tr><td><code>enabled</code>, <code>colors</code></td><td>Tắt mục; đổi màu qua <code>NavigationBarItemDefaults.colors(...)</code>.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h4>4. Kết nối với Navigation Compose</h4>
+    <ul>
+      <li><strong>Biết tab nào đang chọn:</strong> đọc <code>navController.currentBackStackEntryAsState()</code> để lấy đích hiện tại, rồi kiểm tra <code>destination.hierarchy.any { it.hasRoute(route::class) }</code>. Dùng <code>hierarchy</code> thay vì so sánh trực tiếp vì một tab có thể là cả một graph lồng nhau gồm nhiều màn.</li>
+      <li><strong>Chuyển tab mà vẫn giữ trạng thái:</strong> gọi <code>navigate(route)</code> với ba tùy chọn sau. <code>popUpTo(startDestination) { saveState = true }</code> gỡ các màn của tab cũ khỏi back stack nhưng lưu lại trạng thái của chúng. <code>launchSingleTop = true</code> tránh tạo màn trùng khi bấm lại tab đang mở. <code>restoreState = true</code> khôi phục trạng thái đã lưu khi người dùng quay lại tab đó.</li>
+    </ul>
+
+    <h4>5. NavigationRail cho màn rộng</h4>
+    <p><code>NavigationRail</code> nhận nội dung kiểu <code>ColumnScope</code>, nên bạn dùng được <code>Spacer(Modifier.weight(1f))</code> để đẩy các mục vào giữa. Tham số <code>header</code> thường chứa một nút FAB. Hãy đặt rail cạnh nội dung bằng một <code>Row</code>.</p>
+    <pre><code class="language-kotlin">@Composable
+fun AppNavigationRail(
+    current: TopLevelDestination,
+    onSelect: (TopLevelDestination) -&gt; Unit,
+    modifier: Modifier = Modifier
+) {
+    NavigationRail(
+        modifier = modifier,
+        header = {
+            FloatingActionButton(onClick = { /* tạo mục mới */ }) {
+                Icon(painterResource(R.drawable.ic_add), contentDescription = "Tạo mới")
+            }
+        }
+    ) {
+        Spacer(Modifier.weight(1f))
+        TopLevelDestination.entries.forEach { dest -&gt;
+            NavigationRailItem(
+                selected = dest == current,
+                onClick = { onSelect(dest) },
+                icon = { Icon(painterResource(dest.icon), contentDescription = null) },
+                label = { Text(dest.label) }
+            )
+        }
+        Spacer(Modifier.weight(1f))
+    }
+}</code></pre>
+
+    <h4>6. Navigation Drawer</h4>
+    <ul>
+      <li><code>ModalNavigationDrawer(drawerState, drawerContent) { nộiDung }</code>: drawer phủ lên trên nội dung, kèm một lớp nền mờ (scrim) phía sau.</li>
+      <li>Trạng thái đóng/mở nằm trong <code>rememberDrawerState(DrawerValue.Closed)</code>. Hàm <code>open()</code> và <code>close()</code> là hàm <code>suspend</code>, vì vậy phải gọi trong coroutine: <code>scope.launch { drawerState.open() }</code>, với <code>scope</code> lấy từ <code>rememberCoroutineScope()</code>.</li>
+      <li>Đặt nội dung drawer trong <code>ModalDrawerSheet { … }</code>. Mỗi mục là một <code>NavigationDrawerItem(label, selected, onClick, icon, badge)</code>, thêm <code>Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)</code> để có lề chuẩn.</li>
+      <li><code>DismissibleNavigationDrawer</code> đẩy nội dung sang bên khi mở thay vì phủ lên. <code>PermanentNavigationDrawer</code> (đi kèm <code>PermanentDrawerSheet</code>) thì luôn hiển thị và không đóng được.</li>
+    </ul>
+
+    <h4>7. Badge (huy hiệu số)</h4>
+    <pre><code class="language-kotlin">icon = {
+    BadgedBox(badge = { Badge { Text("3") } }) {
+        Icon(painterResource(R.drawable.ic_cart), contentDescription = "Giỏ hàng")
+    }
+}</code></pre>
+
+    <h4>8. NavigationSuiteScaffold tự thích ứng</h4>
+    <p>Thêm thư viện (BOM quản lý phiên bản), sau đó khai báo các mục qua <code>item(selected, onClick, icon, label)</code>. Khung này tự đổi giữa NavigationBar, NavigationRail và drawer theo kích thước cửa sổ. Thường thì cửa sổ hẹp sẽ có thanh dưới, cửa sổ rộng hơn sẽ có rail. Muốn chọn kiểu cố định thì truyền tham số <code>layoutType</code>.</p>
+    <pre><code class="language-kotlin">dependencies {
+    implementation(platform("androidx.compose:compose-bom:2026.09.00"))
+    implementation("androidx.compose.material3:material3-adaptive-navigation-suite")
+}</code></pre>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>Ví dụ 1: App cửa hàng 3 tab với Navigation Compose</h4>
+    <p class="code-caption">Dùng lại <code>TopLevelDestination</code> ở mục 2. Ba dòng import dưới đây là các hàm mở rộng, Android Studio đôi khi không tự gợi ý.</p>
+    <pre><code class="language-kotlin">import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraph.Companion.findStartDestination
+
+@Composable
+fun ShopApp() {
+    val navController = rememberNavController()
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = backStackEntry?.destination
+
+    Scaffold(
+        bottomBar = {
+            NavigationBar {
+                TopLevelDestination.entries.forEach { dest -&gt;
+                    val selected = currentDestination?.hierarchy?.any {
+                        it.hasRoute(dest.route::class)
+                    } == true
+
+                    NavigationBarItem(
+                        selected = selected,
+                        onClick = {
+                            navController.navigate(dest.route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        icon = {
+                            Icon(painterResource(dest.icon), contentDescription = null)
+                        },
+                        label = { Text(dest.label) }
+                    )
+                }
+            }
+        }
+    ) { innerPadding -&gt;
+        NavHost(
+            navController = navController,
+            startDestination = HomeRoute,
+            modifier = Modifier.padding(innerPadding)
+        ) {
+            composable&lt;HomeRoute&gt; { HomeScreen() }
+            composable&lt;SearchRoute&gt; { SearchScreen() }
+            composable&lt;ProfileRoute&gt; { ProfileScreen() }
+        }
+    }
+}
+
+@Composable
+fun HomeScreen() {
+    var likes by rememberSaveable { mutableIntStateOf(0) }
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text("Trang chủ", style = MaterialTheme.typography.headlineSmall)
+        Button(onClick = { likes++ }) { Text("Đã thích $likes lần") }
+    }
+}
+
+@Composable
+fun SearchScreen() {
+    var query by rememberSaveable { mutableStateOf("") }
+    OutlinedTextField(
+        value = query,
+        onValueChange = { query = it },
+        label = { Text("Tìm sản phẩm") },
+        modifier = Modifier.fillMaxWidth().padding(16.dp)
+    )
+}
+
+@Composable
+fun ProfileScreen() {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text("Hồ sơ của bạn", style = MaterialTheme.typography.headlineSmall)
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Đáy màn hình có thanh 3 tab, tab đang mở được đánh dấu bằng nền viên thuốc. Thử gõ "áo khoác" ở tab Tìm kiếm, chuyển sang Trang chủ rồi quay lại: chữ vẫn còn nguyên, vì <code>saveState</code>/<code>restoreState</code> đã giữ trạng thái của tab. Khi đang ở tab Hồ sơ, bấm Back sẽ về Trang chủ trước rồi mới thoát app.</p>
+
+    <h4>Ví dụ 2: Drawer cho app ghi chú</h4>
+    <pre><code class="language-kotlin">enum class NoteFolder(val label: String, @DrawableRes val icon: Int) {
+    ALL("Tất cả ghi chú", R.drawable.ic_notes),
+    WORK("Công việc", R.drawable.ic_work),
+    PERSONAL("Cá nhân", R.drawable.ic_person),
+    TRASH("Thùng rác", R.drawable.ic_delete),
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NotesApp() {
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    var folder by rememberSaveable { mutableStateOf(NoteFolder.ALL) }
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet {
+                Text(
+                    text = "Sổ ghi chú",
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(horizontal = 28.dp, vertical = 20.dp)
+                )
+                NoteFolder.entries.forEach { item -&gt;
+                    NavigationDrawerItem(
+                        label = { Text(item.label) },
+                        selected = item == folder,
+                        onClick = {
+                            folder = item
+                            scope.launch { drawerState.close() }
+                        },
+                        icon = { Icon(painterResource(item.icon), contentDescription = null) },
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+                }
+            }
+        }
+    ) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(folder.label) },
+                    navigationIcon = {
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            Icon(painterResource(R.drawable.ic_menu), contentDescription = "Mở menu")
+                        }
+                    }
+                )
+            }
+        ) { innerPadding -&gt;
+            Box(
+                modifier = Modifier.fillMaxSize().padding(innerPadding),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Các ghi chú trong mục \"${folder.label}\"")
+            }
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Thanh trên cùng có nút menu ba gạch. Bấm nút đó, hoặc vuốt từ cạnh trái, thì drawer trượt ra phủ lên nội dung, phía sau có lớp nền mờ. Chọn "Công việc" thì drawer tự đóng, tiêu đề đổi thành "Công việc".</p>
+
+    <h4>Ví dụ 3: Một khung, tự thích ứng mọi màn hình</h4>
+    <pre><code class="language-kotlin">@Composable
+fun AdaptiveShopApp() {
+    var current by rememberSaveable { mutableStateOf(TopLevelDestination.HOME) }
+
+    NavigationSuiteScaffold(
+        navigationSuiteItems = {
+            TopLevelDestination.entries.forEach { dest -&gt;
+                item(
+                    selected = dest == current,
+                    onClick = { current = dest },
+                    icon = { Icon(painterResource(dest.icon), contentDescription = null) },
+                    label = { Text(dest.label) }
+                )
+            }
+        }
+    ) {
+        when (current) {
+            TopLevelDestination.HOME -&gt; HomeScreen()
+            TopLevelDestination.SEARCH -&gt; SearchScreen()
+            TopLevelDestination.PROFILE -&gt; ProfileScreen()
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Khi điện thoại cầm dọc, các tab nằm trên thanh ở đáy màn hình. Xoay ngang hoặc mở trên tablet thì chúng tự chuyển sang rail bên trái, bạn không phải viết thêm dòng nào. Ở app thật, thay khối <code>when</code> bằng <code>NavHost</code> như Ví dụ 1. Xem thêm ở <a href="#adaptive">Giao diện thích ứng</a>.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li><strong>Đúng số lượng:</strong> NavigationBar chỉ hợp với 3–5 đích. Nếu chỉ có 2 đích, dùng tab (<code>TabRow</code>) sẽ hợp hơn. Từ 6 đích trở lên thì chuyển sang drawer.</li>
+      <li><strong>Chỉ dùng một thanh chung:</strong> đặt <code>NavigationBar</code> trong <code>Scaffold</code> bao ngoài <code>NavHost</code>, đừng đặt riêng trong từng màn hình. Nếu muốn ẩn thanh ở màn chi tiết, tính một biến <code>showBottomBar</code> từ đích hiện tại, rồi chỉ vẽ thanh khi biến đó là <code>true</code>.</li>
+      <li><strong>Thiếu tùy chọn navigate:</strong> nếu bỏ <code>popUpTo</code>, mỗi lần đổi tab back stack lại dài thêm, và bấm Back sẽ lùi qua từng tab. Nếu bỏ <code>saveState</code>/<code>restoreState</code>, tab sẽ mất vị trí cuộn và chữ đã nhập khi bạn quay lại.</li>
+      <li><strong>Khả năng truy cập:</strong> khi mục đã có <code>label</code>, đặt <code>contentDescription = null</code> cho icon để TalkBack không đọc hai lần. Nếu không có nhãn chữ thì bắt buộc phải mô tả icon (xem <a href="#accessibility">Accessibility</a>).</li>
+      <li><strong>Insets:</strong> <code>NavigationBar</code> đã tự chừa chỗ cho thanh điều hướng hệ thống. Đừng thêm <code>navigationBarsPadding()</code> lần nữa, nhưng nhớ truyền <code>innerPadding</code> của <code>Scaffold</code> cho <code>NavHost</code> (xem <a href="#edge-to-edge">Edge-to-edge</a>).</li>
+      <li><strong>Drawer:</strong> nếu có nhiều mục, bọc chúng trong <code>Column(Modifier.verticalScroll(rememberScrollState()))</code> bên trong <code>ModalDrawerSheet</code>. Hãy thử bấm Back khi drawer đang mở. Nếu drawer không tự đóng, thêm <code>BackHandler(enabled = drawerState.isOpen) { scope.launch { drawerState.close() } }</code>.</li>
+    </ul>
+    <div class="callout tip"><strong>Mẹo:</strong> Nhãn tab nên ngắn, lý tưởng là một hai từ. Trong app thật, hãy lưu nhãn bằng <code>@StringRes</code> và đọc qua <code>stringResource(...)</code> để dễ dịch sang ngôn ngữ khác.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/components/navigation-bar?hl=vi" target="_blank" rel="noopener">Thanh điều hướng (Navigation bar) trong Compose</a></p>
+</section>

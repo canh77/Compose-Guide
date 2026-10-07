@@ -1,0 +1,236 @@
+<section class="topic" id="navigation" data-title="Navigation Compose">
+  <h2>Điều hướng với Navigation Compose</h2>
+  <p class="lead">Hầu hết ứng dụng có nhiều màn hình: danh sách, chi tiết, chỉnh sửa, cài đặt. Navigation Compose quản lý việc chuyển giữa các màn hình, truyền tham số và nút Back một cách nhất quán, với route kiểm tra kiểu ngay lúc biên dịch.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p>Trong hệ View cũ, mỗi màn hình thường là một <code>Activity</code> hoặc <code>Fragment</code>, chuyển màn bằng <code>Intent</code> hay <code>FragmentTransaction</code>. Với Compose, màn hình chỉ là hàm composable, nên cần một thành phần ghi nhớ "đang ở màn nào, trước đó là màn nào" và hiển thị đúng composable. Thư viện <strong>Navigation Compose</strong> (<code>androidx.navigation:navigation-compose:2.10.2</code>) làm việc đó. Từ bản 2.8, mỗi màn hình được định danh bằng một lớp Kotlin đánh dấu <code>@Serializable</code>, gọi là <em>route type-safe</em>, thay cho chuỗi đường dẫn dễ gõ sai.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Khái niệm</th><th>Ý nghĩa</th></tr></thead>
+      <tbody>
+        <tr><td><code>NavController</code></td><td>"Bộ điều khiển" giữ back stack và thực hiện lệnh <code>navigate</code>, <code>popBackStack</code>. Tạo bằng <code>rememberNavController()</code>.</td></tr>
+        <tr><td><code>NavHost</code></td><td>Composable hiển thị màn hình ứng với đích hiện tại trong back stack.</td></tr>
+        <tr><td>Navigation graph</td><td>Tập hợp mọi đích và cách chúng nối với nhau, khai báo trong lambda của <code>NavHost</code>.</td></tr>
+        <tr><td>Destination (đích)</td><td>Một màn hình trong graph, khai báo bằng <code>composable&lt;Route&gt; { … }</code>.</td></tr>
+        <tr><td>Route</td><td>Lớp/object <code>@Serializable</code> định danh một đích, có thể mang tham số.</td></tr>
+        <tr><td>Back stack</td><td>Ngăn xếp các đích đã mở; đích trên cùng đang hiển thị. Mỗi phần tử là một <code>NavBackStackEntry</code>.</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>Bước 1: Thiết lập Gradle</h4>
+    <p class="code-caption">gradle/libs.versions.toml (dùng lại version <code>kotlin</code> đã có sẵn trong catalog)</p>
+    <pre><code class="language-toml">[versions]
+navigationCompose = "2.10.2"
+kotlinxSerializationJson = "1.7.3"
+
+[libraries]
+androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
+
+[plugins]
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }</code></pre>
+    <pre><code class="language-kotlin">// build.gradle.kts (cấp project)
+plugins {
+    alias(libs.plugins.kotlin.serialization) apply false
+}
+
+// app/build.gradle.kts
+plugins {
+    alias(libs.plugins.kotlin.serialization)
+}
+dependencies {
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.kotlinx.serialization.json)
+}</code></pre>
+    <p>Không dùng version catalog thì khai báo trực tiếp: plugin <code>id("org.jetbrains.kotlin.plugin.serialization")</code> với version <strong>bằng đúng version Kotlin</strong> của dự án, cùng <code>implementation("androidx.navigation:navigation-compose:2.10.2")</code> và <code>implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")</code>.</p>
+
+    <h4>Bước 2: Định nghĩa route</h4>
+    <pre><code class="language-kotlin">@Serializable object NoteList                          // không có tham số
+@Serializable data class NoteDetail(val noteId: String) // có tham số
+@Serializable data class NoteEdit(val noteId: String)</code></pre>
+
+    <h4>Bước 3: Tạo NavHost, điều hướng và nhận tham số</h4>
+    <ul>
+      <li>Đi tới màn khác: <code>navController.navigate(NoteDetail(noteId = "42"))</code>.</li>
+      <li>Nhận tham số trong đích: <code>val detail: NoteDetail = backStackEntry.toRoute()</code>.</li>
+      <li>Quay lại: <code>navController.popBackStack()</code> (bỏ đích trên cùng) hoặc <code>navController.navigateUp()</code> (nút mũi tên trên thanh tiêu đề). Nút Back hệ thống được <code>NavHost</code> xử lý tự động.</li>
+      <li>Chỉ truyền <strong>ID</strong> hoặc giá trị nhỏ, không truyền cả đối tượng lớn. Màn đích dùng ID để tự lấy dữ liệu từ repository/ViewModel.</li>
+    </ul>
+
+    <h4>Tùy chọn khi điều hướng</h4>
+    <p>Sau khi đăng nhập thành công, người dùng không nên bấm Back mà quay lại màn đăng nhập:</p>
+    <pre><code class="language-kotlin">navController.navigate(Home) {
+    popUpTo&lt;Login&gt; { inclusive = true } // xóa mọi đích đến hết Login, kể cả Login
+    launchSingleTop = true             // không tạo bản sao nếu Home đã ở trên cùng
+}</code></pre>
+
+    <h4>Graph lồng nhau (nested graph)</h4>
+    <p>Gom các màn hình liên quan thành một nhóm có đích bắt đầu riêng; từ bên ngoài chỉ cần <code>navigate(SettingsGraph)</code>.</p>
+    <pre><code class="language-kotlin">@Serializable object SettingsGraph
+@Serializable object SettingsHome
+@Serializable object AccountSettings
+
+// bên trong NavHost { … }
+navigation&lt;SettingsGraph&gt;(startDestination = SettingsHome) {
+    composable&lt;SettingsHome&gt; { /* ... */ }
+    composable&lt;AccountSettings&gt; { /* ... */ }
+}</code></pre>
+
+    <h4>ViewModel theo từng đích</h4>
+    <p>Gọi <code>viewModel()</code> (thư viện <code>lifecycle-viewmodel-compose</code>) bên trong <code>composable&lt;…&gt;</code> sẽ tạo ViewModel gắn với đích đó: sống khi đích còn trong back stack, bị hủy khi đích bị pop. <code>SavedStateHandle</code> của ViewModel chứa sẵn tham số route:</p>
+    <pre><code class="language-kotlin">class NoteDetailViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
+    private val route = savedStateHandle.toRoute&lt;NoteDetail&gt;()
+    val note: Note? = NotesRepository.find(route.noteId)
+}</code></pre>
+
+    <h4>Deep link</h4>
+    <p>Cho phép mở thẳng một đích từ đường dẫn bên ngoài. Navigation tự ghép tham số của route vào sau <code>basePath</code>; bạn cần khai báo thêm <code>intent-filter</code> tương ứng cho Activity trong <code>AndroidManifest.xml</code>.</p>
+    <pre><code class="language-kotlin">composable&lt;NoteDetail&gt;(
+    deepLinks = listOf(navDeepLink&lt;NoteDetail&gt;(basePath = "https://example.com/note"))
+) { /* ... */ }</code></pre>
+
+    <div class="callout info"><strong>Lưu ý:</strong> Google còn phát triển <strong>Navigation 3</strong> (<code>androidx.navigation3</code>), thư viện mới hơn trong đó back stack là một danh sách do chính ứng dụng sở hữu và điều khiển. Khi đã vững Navigation Compose, bạn có thể tìm hiểu thêm hướng này.</div>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>App ghi chú: danh sách → chi tiết → sửa</h4>
+    <p class="code-caption">Dữ liệu và route. Repository lưu trong bộ nhớ cho gọn; ứng dụng thật nên dùng ViewModel và Room.</p>
+    <pre><code class="language-kotlin">data class Note(val id: String, val title: String, val body: String)
+
+object NotesRepository {
+    private val notes = mutableStateListOf(
+        Note("1", "Đi chợ", "Mua rau, trứng, sữa"),
+        Note("2", "Học Compose", "Đọc phần Navigation")
+    )
+    fun all(): List&lt;Note&gt; = notes
+    fun find(id: String): Note? = notes.firstOrNull { it.id == id }
+    fun update(note: Note) {
+        val index = notes.indexOfFirst { it.id == note.id }
+        if (index &gt;= 0) notes[index] = note
+    }
+}
+
+@Serializable object NoteList
+@Serializable data class NoteDetail(val noteId: String)
+@Serializable data class NoteEdit(val noteId: String)</code></pre>
+    <p class="code-caption">Graph điều hướng: chỉ nơi này biết đến <code>NavController</code>.</p>
+    <pre><code class="language-kotlin">@Composable
+fun NotesApp() {
+    val navController = rememberNavController()
+    NavHost(navController = navController, startDestination = NoteList) {
+        composable&lt;NoteList&gt; {
+            NoteListScreen(onOpenNote = { id -&gt; navController.navigate(NoteDetail(noteId = id)) })
+        }
+        composable&lt;NoteDetail&gt; { backStackEntry -&gt;
+            val detail: NoteDetail = backStackEntry.toRoute()
+            NoteDetailScreen(
+                noteId = detail.noteId,
+                onEdit = { id -&gt; navController.navigate(NoteEdit(noteId = id)) },
+                onBack = { navController.navigateUp() }
+            )
+        }
+        composable&lt;NoteEdit&gt; { backStackEntry -&gt;
+            val edit: NoteEdit = backStackEntry.toRoute()
+            NoteEditScreen(noteId = edit.noteId, onDone = { navController.popBackStack() })
+        }
+    }
+}</code></pre>
+    <p class="code-caption">Các màn hình chỉ nhận lambda, không nhận <code>NavController</code>. Icon mũi tên là file Material Symbols <code>ic_arrow_back.xml</code> tải từ Google Fonts (tên giả định); thêm <code>android:autoMirrored="true"</code> vào thẻ <code>vector</code> để mũi tên tự lật khi dùng ngôn ngữ RTL (xem <a href="#image-icon">Image &amp; Icon</a>).</p>
+    <pre><code class="language-kotlin">@Composable
+fun BackButton(onClick: () -&gt; Unit) {
+    IconButton(onClick = onClick) {
+        Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = "Quay lại")
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NoteListScreen(onOpenNote: (String) -&gt; Unit) {
+    Scaffold(topBar = { TopAppBar(title = { Text("Ghi chú") }) }) { innerPadding -&gt;
+        LazyColumn(contentPadding = innerPadding) {
+            items(NotesRepository.all(), key = { it.id }) { note -&gt;
+                ListItem(
+                    headlineContent = { Text(note.title) },
+                    supportingContent = { Text(note.body, maxLines = 1) },
+                    modifier = Modifier.clickable { onOpenNote(note.id) }
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NoteDetailScreen(noteId: String, onEdit: (String) -&gt; Unit, onBack: () -&gt; Unit) {
+    val note = NotesRepository.find(noteId)
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(note?.title ?: "Không tìm thấy") },
+                navigationIcon = { BackButton(onBack) },
+                actions = {
+                    TextButton(onClick = { onEdit(noteId) }, enabled = note != null) { Text("Sửa") }
+                }
+            )
+        }
+    ) { innerPadding -&gt;
+        Text(
+            text = note?.body ?: "Ghi chú không còn tồn tại.",
+            modifier = Modifier.padding(innerPadding).padding(16.dp)
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NoteEditScreen(noteId: String, onDone: () -&gt; Unit) {
+    val note = NotesRepository.find(noteId) ?: return
+    var title by rememberSaveable { mutableStateOf(note.title) }
+    var body by rememberSaveable { mutableStateOf(note.body) }
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Sửa ghi chú") },
+                navigationIcon = { BackButton(onDone) },
+                actions = {
+                    TextButton(onClick = {
+                        NotesRepository.update(note.copy(title = title, body = body))
+                        onDone()
+                    }) { Text("Lưu") }
+                }
+            )
+        }
+    ) { innerPadding -&gt;
+        Column(
+            Modifier.padding(innerPadding).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            OutlinedTextField(value = title, onValueChange = { title = it },
+                label = { Text("Tiêu đề") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = body, onValueChange = { body = it },
+                label = { Text("Nội dung") }, minLines = 5, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Ứng dụng mở ở danh sách hai ghi chú. Chạm "Đi chợ" mở màn chi tiết có mũi tên quay lại và nút "Sửa". Ở màn sửa, đổi tiêu đề rồi bấm "Lưu": ứng dụng quay về màn chi tiết và tiêu đề mới hiển thị ngay. Nút Back hệ thống đi lùi đúng thứ tự sửa → chi tiết → danh sách.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li>Tạo <code>NavController</code> một lần ở cấp cao nhất (cạnh <code>NavHost</code>). Không truyền nó xuống các màn hình; hãy truyền lambda như <code>onOpenDetail: (String) -&gt; Unit</code> để màn hình dễ Preview, dễ test và tái sử dụng.</li>
+      <li>Chỉ gọi <code>navigate</code> trong callback (<code>onClick</code>) hoặc effect, không gọi trong thân composable; nếu không, lệnh điều hướng chạy lại sau mỗi lần recompose.</li>
+      <li>Người dùng bấm nhanh hai lần có thể mở hai bản sao màn hình. Dùng <code>launchSingleTop = true</code>, hoặc bọc callback bằng <code>dropUnlessResumed { … }</code> của <code>lifecycle-runtime-compose</code>.</li>
+      <li>Route chỉ nên chứa ID và kiểu đơn giản (<code>String</code>, <code>Int</code>, <code>Boolean</code>…). Đối tượng lớn sẽ bị tuần tự hóa vào back stack, tốn bộ nhớ và dễ lỗi khi khôi phục.</li>
+      <li><code>navigateUp()</code> không thoát ứng dụng khi đang ở đích bắt đầu, còn <code>popBackStack()</code> ở đích cuối cùng có thể để lại màn hình trống. Dùng <code>navigateUp()</code> cho nút mũi tên trên <code>TopAppBar</code>.</li>
+      <li>Quên áp dụng plugin <code>kotlin.plugin.serialization</code> sẽ gây lỗi khi chạy (không tìm thấy serializer cho route), dù code vẫn biên dịch được.</li>
+    </ul>
+    <div class="callout tip"><strong>Mẹo:</strong> Kết hợp với thanh điều hướng dưới đáy màn hình ở mục <a href="#navigation-bar">Thanh điều hướng</a> để chuyển giữa các tab chính.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/navigation" target="_blank" rel="noopener">Navigation with Compose</a> và <a href="https://developer.android.com/guide/navigation" target="_blank" rel="noopener">Navigation</a></p>
+</section>

@@ -1,0 +1,251 @@
+<section class="topic" id="kotlin-can-biet" data-title="Kotlin cần biết">
+  <h2>Kotlin cần biết trước khi học Compose</h2>
+  <p class="lead">Compose được thiết kế riêng cho Kotlin và tận dụng rất nhiều tính năng của ngôn ngữ này. Nắm chắc khoảng một chục tính năng dưới đây sẽ giúp bạn đọc hiểu code Compose thay vì chỉ chép theo.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p>Khác với hệ thống View (vốn được viết cho Java rồi mới có thêm Kotlin), API của Compose được thiết kế ngay từ đầu cho Kotlin. Cú pháp gọn gàng như <code>Column { Text("Xin chào") }</code> thực chất là sự kết hợp của nhiều tính năng: <em>trailing lambda</em>, <em>tham số mặc định</em>, <em>lambda có receiver</em>…</p>
+    <p>Bạn không cần thành thạo toàn bộ Kotlin, nhưng nếu chưa quen các khái niệm này, code Compose sẽ trông như "phép thuật". Mục này giải thích từng tính năng kèm một đoạn code mang hơi hướng Compose; cuối mục là bảng tổng hợp để tra nhanh.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>1. Lambda và trailing lambda</h4>
+    <p><em>Lambda</em> là một khối code được truyền đi như giá trị, viết trong <code>{ }</code>. Khi tham số cuối cùng của hàm là lambda, Kotlin cho phép đưa nó ra <em>sau</em> cặp ngoặc tròn (trailing lambda); nếu đó là tham số duy nhất cần truyền, có thể bỏ luôn ngoặc tròn.</p>
+    <pre><code class="language-kotlin">// Cách viết đầy đủ
+Button(onClick = { println("Đã bấm") }, content = { Text("Gửi") })
+
+// Trailing lambda: tham số content đưa ra ngoài ngoặc
+Button(onClick = { println("Đã bấm") }) {
+    Text("Gửi")
+}
+
+// Chỉ còn lambda: bỏ luôn ngoặc tròn
+Column {
+    Text("Dòng 1")
+    Text("Dòng 2")
+}</code></pre>
+
+    <h4>2. Tham số mặc định và tham số đặt tên</h4>
+    <p>Hàm Kotlin có thể cho tham số giá trị mặc định, và khi gọi có thể ghi rõ tên tham số (named argument), không cần đúng thứ tự. Nhờ vậy <code>Text</code> có hơn chục tham số nhưng bạn chỉ truyền thứ mình cần.</p>
+    <pre><code class="language-kotlin">Text("Tiêu đề") // mọi tham số khác dùng giá trị mặc định
+
+Text(
+    text = "Mô tả rất dài của sản phẩm…",
+    maxLines = 2,
+    overflow = TextOverflow.Ellipsis,
+    color = Color.Gray
+)</code></pre>
+
+    <h4>3. Hàm mở rộng (extension function)</h4>
+    <p>Extension cho phép "gắn thêm" hàm hoặc thuộc tính vào một kiểu có sẵn mà không cần kế thừa. <code>16.dp</code>, <code>18.sp</code> là extension property của <code>Int</code>; <code>Modifier.padding()</code> là extension function của <code>Modifier</code>. Bạn cũng tự viết được:</p>
+    <pre><code class="language-kotlin">fun Modifier.outlinedBox(): Modifier =
+    this
+        .border(1.dp, Color.LightGray, RoundedCornerShape(8.dp))
+        .padding(12.dp)
+
+// Dùng: Text("Ghi chú", modifier = Modifier.outlinedBox())</code></pre>
+
+    <h4>4. Hàm bậc cao (higher-order function)</h4>
+    <p>Là hàm nhận hàm khác làm tham số (hoặc trả về hàm). Mọi sự kiện trong Compose đều là tham số kiểu hàm: <code>onClick: () -&gt; Unit</code>, <code>onCheckedChange: (Boolean) -&gt; Unit</code>. Các hàm xử lý danh sách như <code>filter</code>, <code>map</code>, <code>forEach</code> cũng là hàm bậc cao.</p>
+    <pre><code class="language-kotlin">@Composable
+fun QuantityStepper(quantity: Int, onQuantityChange: (Int) -&gt; Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        TextButton(onClick = { onQuantityChange(quantity - 1) }) { Text("-") }
+        Text("$quantity")
+        TextButton(onClick = { onQuantityChange(quantity + 1) }) { Text("+") }
+    }
+}</code></pre>
+
+    <h4>5. Lambda có receiver và scope</h4>
+    <p>Kiểu <code>ColumnScope.() -&gt; Unit</code> nghĩa là: bên trong lambda, <code>this</code> là một <code>ColumnScope</code>. Tham số <code>content</code> của <code>Column</code>, <code>Row</code>, <code>Box</code> đều có dạng này, nên bên trong chúng bạn dùng được các modifier chỉ dành riêng cho layout đó, như <code>Modifier.weight()</code> (Row/Column) hay <code>Modifier.align()</code>. Ra ngoài scope thì không gọi được — trình biên dịch sẽ báo lỗi, giúp bạn không dùng sai chỗ.</p>
+    <pre><code class="language-kotlin">Row(modifier = Modifier.fillMaxWidth()) {
+    // this: RowScope -&gt; có Modifier.weight
+    Text("Tên sản phẩm", modifier = Modifier.weight(1f))
+    Text("120.000đ")
+}
+
+Column(modifier = Modifier.fillMaxWidth()) {
+    // this: ColumnScope -&gt; align nhận Alignment.Horizontal
+    Text("Căn giữa", modifier = Modifier.align(Alignment.CenterHorizontally))
+}</code></pre>
+
+    <h4>6. Thuộc tính ủy quyền (<code>by</code>)</h4>
+    <p>Từ khóa <code>by</code> giao việc đọc/ghi một biến cho đối tượng khác. Với state, nó giúp bỏ <code>.value</code>. Cần import hai hàm <code>getValue</code>/<code>setValue</code>, nếu thiếu IDE sẽ báo lỗi khó hiểu.</p>
+    <pre><code class="language-kotlin">import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+
+val nameState = remember { mutableStateOf("") } // kiểu MutableState&lt;String&gt;
+nameState.value = "Lan"
+
+var name by remember { mutableStateOf("") }      // kiểu String
+name = "Lan"</code></pre>
+
+    <h4>7. Kiểu nullable, <code>?.</code> và <code>?:</code></h4>
+    <p>Kiểu có dấu <code>?</code> (như <code>String?</code>) có thể bằng <code>null</code>. Toán tử <code>?.</code> chỉ gọi tiếp khi khác null; toán tử Elvis <code>?:</code> cung cấp giá trị thay thế. Rất hay dùng để hiển thị có điều kiện.</p>
+    <pre><code class="language-kotlin">Text(contact.phone ?: "Chưa có số điện thoại")
+contact.nickname?.let { Text("Biệt danh: $it") } // chỉ hiện khi có</code></pre>
+
+    <h4>8. Data class</h4>
+    <p><code>data class</code> tự sinh <code>equals</code>, <code>hashCode</code>, <code>toString</code> và <code>copy</code>. Compose so sánh tham số bằng <code>equals</code> để quyết định có cần vẽ lại hay không, nên data class với các thuộc tính <code>val</code> là lựa chọn tự nhiên cho dữ liệu giao diện. Muốn "sửa" thì tạo bản sao mới bằng <code>copy</code>.</p>
+    <pre><code class="language-kotlin">data class Note(val id: Long, val title: String, val pinned: Boolean = false)
+
+val pinnedNote = note.copy(pinned = true)</code></pre>
+
+    <h4>9. Sealed interface</h4>
+    <p><code>sealed interface</code> giới hạn tập con được phép, nên <code>when</code> có thể kiểm tra đủ mọi trường hợp mà không cần <code>else</code>. Đây là cách phổ biến để mô tả trạng thái màn hình: đang tải, thành công, lỗi (xem ví dụ 2 bên dưới).</p>
+
+    <h4>10. <code>object</code> và <code>companion object</code></h4>
+    <p><code>object</code> tạo ra một đối tượng duy nhất (singleton), tiện để gom hằng số. <code>companion object</code> là object gắn với một lớp. Thực tế, khi bạn viết <code>Modifier</code> trơn, đó là companion object của interface <code>Modifier</code>; <code>Color.Red</code>, <code>Alignment.Center</code> cũng là thành viên companion.</p>
+    <pre><code class="language-kotlin">object Spacing {
+    val Small = 8.dp
+    val Medium = 16.dp
+}
+
+// Dùng: Modifier.padding(Spacing.Medium)</code></pre>
+
+    <h4>11. Scope function: <code>let</code>, <code>apply</code></h4>
+    <p><code>let</code> chạy một khối với giá trị làm tham số <code>it</code>, thường đi cùng <code>?.</code>. <code>apply</code> cấu hình một đối tượng rồi trả về chính nó, hay gặp khi nhúng View cũ vào Compose (xem <a href="#interop">Tương thích View</a>).</p>
+    <pre><code class="language-kotlin">selectedNote?.let { note -&gt; NoteDetail(note) }
+
+AndroidView(factory = { context -&gt;
+    TextView(context).apply {
+        text = "View cũ bên trong Compose"
+        textSize = 18f
+    }
+})</code></pre>
+
+    <h4>12. Coroutine cơ bản: <code>suspend</code>, <code>launch</code></h4>
+    <p>Coroutine là cách viết code bất đồng bộ (chờ mạng, chờ animation) trông như code tuần tự. Hàm <code>suspend</code> có thể "tạm dừng" mà không chặn luồng giao diện, và chỉ được gọi từ coroutine. Trong Compose, bạn khởi chạy coroutine bằng <code>LaunchedEffect</code> (khi composable xuất hiện) hoặc <code>rememberCoroutineScope().launch</code> (khi người dùng thao tác) — chi tiết ở <a href="#side-effects">Side effects</a>.</p>
+    <pre><code class="language-kotlin">val scope = rememberCoroutineScope()
+Button(onClick = {
+    scope.launch { listState.animateScrollToItem(0) } // hàm suspend
+}) {
+    Text("Lên đầu danh sách")
+}</code></pre>
+
+    <h4>Bảng tổng hợp</h4>
+    <div class="table-wrap"><table>
+      <thead>
+        <tr><th>Tính năng Kotlin</th><th>Thấy ở đâu trong Compose</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Trailing lambda</td><td><code>Column { … }</code>, <code>Button(onClick = …) { … }</code></td></tr>
+        <tr><td>Tham số mặc định / đặt tên</td><td><code>Text(text = …, maxLines = 1)</code>, <code>modifier: Modifier = Modifier</code></td></tr>
+        <tr><td>Extension</td><td><code>16.dp</code>, <code>14.sp</code>, <code>Modifier.padding()</code>, modifier tự viết</td></tr>
+        <tr><td>Hàm bậc cao</td><td><code>onClick</code>, <code>onValueChange</code>, <code>items(list) { … }</code></td></tr>
+        <tr><td>Lambda có receiver</td><td><code>ColumnScope</code>, <code>RowScope</code>, <code>BoxScope</code>, <code>LazyListScope</code></td></tr>
+        <tr><td>Ủy quyền <code>by</code></td><td><code>var x by remember { mutableStateOf(…) }</code>, <code>by collectAsStateWithLifecycle()</code></td></tr>
+        <tr><td>Nullable, <code>?.</code>, <code>?:</code></td><td>Hiển thị có điều kiện, giá trị dự phòng</td></tr>
+        <tr><td>Data class</td><td>Model dữ liệu, UI state bất biến, <code>copy()</code></td></tr>
+        <tr><td>Sealed interface</td><td>Trạng thái màn hình Loading / Success / Error</td></tr>
+        <tr><td><code>object</code> / companion</td><td><code>Modifier</code>, <code>Color.Red</code>, <code>Alignment.Center</code>, hằng số dùng chung</td></tr>
+        <tr><td><code>let</code> / <code>apply</code></td><td>Giá trị nullable, cấu hình View trong <code>AndroidView</code></td></tr>
+        <tr><td>Coroutine</td><td><code>LaunchedEffect</code>, <code>rememberCoroutineScope</code>, <code>showSnackbar</code>, cuộn bằng code</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>Ví dụ 1: Dòng ghi chú kết hợp nhiều tính năng</h4>
+    <p class="code-caption">Data class, nullable, extension, scope, hàm bậc cao, trailing lambda</p>
+    <pre><code class="language-kotlin">data class Note(
+    val id: Long,
+    val title: String,
+    val tag: String? = null,
+    val done: Boolean = false
+)
+
+fun Modifier.noteCard(): Modifier =
+    this
+        .fillMaxWidth()
+        .border(1.dp, Color.LightGray, RoundedCornerShape(12.dp))
+        .padding(12.dp)
+
+@Composable
+fun NoteRow(
+    note: Note,
+    onToggleDone: (Note) -&gt; Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.noteCard(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = note.title, style = MaterialTheme.typography.titleMedium)
+            note.tag?.let { Text(text = "#$it", color = Color.Gray) }
+        }
+        Checkbox(
+            checked = note.done,
+            onCheckedChange = { onToggleDone(note) }
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun NoteRowPreview() {
+    var note by remember { mutableStateOf(Note(id = 1, title = "Mua sữa", tag = "việc nhà")) }
+    NoteRow(
+        note = note,
+        onToggleDone = { note = it.copy(done = !it.done) },
+        modifier = Modifier.padding(8.dp)
+    )
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Một khung viền bo góc chứa tiêu đề "Mua sữa", bên dưới là "#việc nhà" màu xám, bên phải là ô checkbox. Bấm checkbox thì ô được đánh dấu/bỏ đánh dấu (ở chế độ Interactive của preview hoặc khi chạy app).</p>
+
+    <h4>Ví dụ 2: Sealed interface và coroutine</h4>
+    <pre><code class="language-kotlin">sealed interface WeatherUiState {
+    data object Loading : WeatherUiState
+    data class Success(val city: String, val temperature: Int) : WeatherUiState
+    data class Error(val message: String) : WeatherUiState
+}
+
+suspend fun loadWeather(city: String): WeatherUiState {
+    delay(1_000) // giả lập gọi mạng mất 1 giây
+    return if (city.isBlank()) {
+        WeatherUiState.Error("Chưa chọn thành phố")
+    } else {
+        WeatherUiState.Success(city = city, temperature = 31)
+    }
+}
+
+@Composable
+fun WeatherScreen(city: String, modifier: Modifier = Modifier) {
+    var state by remember { mutableStateOf&lt;WeatherUiState&gt;(WeatherUiState.Loading) }
+
+    LaunchedEffect(city) {
+        state = WeatherUiState.Loading
+        state = loadWeather(city)
+    }
+
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        when (val current = state) {
+            WeatherUiState.Loading -&gt; CircularProgressIndicator()
+            is WeatherUiState.Success -&gt; Text(
+                text = "${current.city}: ${current.temperature}°C",
+                style = MaterialTheme.typography.headlineMedium
+            )
+            is WeatherUiState.Error -&gt; Text("Lỗi: ${current.message}")
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Gọi <code>WeatherScreen(city = "Đà Nẵng")</code>: vòng tròn tải quay khoảng 1 giây, sau đó hiện chữ lớn "Đà Nẵng: 31°C" ở giữa màn hình. Nếu truyền chuỗi rỗng, màn hình hiện "Lỗi: Chưa chọn thành phố".</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li>Quên <code>import androidx.compose.runtime.getValue</code> / <code>setValue</code> là lỗi rất phổ biến khi dùng <code>by</code>. Android Studio thường gợi ý import khi bạn nhấn Alt+Enter.</li>
+      <li>Biến khai báo bằng <code>by</code> không được Kotlin smart cast. Vì vậy ví dụ 2 dùng <code>when (val current = state)</code> để có một biến cục bộ ép kiểu được.</li>
+      <li>Ưu tiên <code>val</code> và kiểu bất biến (<code>List</code> thay vì <code>MutableList</code>) cho dữ liệu truyền vào composable. Sửa trực tiếp phần tử trong danh sách mutable sẽ không làm giao diện cập nhật.</li>
+      <li>Thứ tự trailing lambda quan trọng: chỉ tham số <em>cuối cùng</em> mới đưa ra ngoài ngoặc được. Vì thế các composable luôn đặt <code>content</code> ở cuối danh sách tham số.</li>
+      <li>Đừng gọi hàm <code>suspend</code> trực tiếp trong thân composable hay trong <code>onClick</code>; cần một coroutine scope (<code>LaunchedEffect</code> hoặc <code>rememberCoroutineScope</code>).</li>
+    </ul>
+    <div class="callout tip"><strong>Mẹo:</strong> Trong Android Studio, nhấn Ctrl (Cmd trên macOS) và bấm vào tên một composable như <code>Column</code> để xem chữ ký hàm. Đọc chữ ký là cách nhanh nhất để biết lambda có receiver nào và tham số nào có giá trị mặc định.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/kotlin?hl=vi" target="_blank" rel="noopener">Kotlin cho Jetpack Compose</a></p>
+</section>

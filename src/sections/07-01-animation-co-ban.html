@@ -1,0 +1,261 @@
+<section class="topic" id="animation-co-ban" data-title="Animation cơ bản">
+  <h2>Animation cơ bản</h2>
+  <p class="lead">Animation giúp người dùng thấy rõ điều gì vừa thay đổi trên màn hình: một nút đổi màu, một thẻ mở rộng, một con số tăng lên. Compose có sẵn các API cấp cao, thường chỉ cần một dòng code là có hiệu ứng mượt.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p>Trong Compose, animation thực chất là <strong>state thay đổi dần theo thời gian</strong>. Bình thường, khi state đổi từ A sang B, giao diện nhảy ngay sang B. API animation thì tạo ra một chuỗi giá trị trung gian giữa A và B trong vài trăm mili giây, và mỗi khung hình Compose vẽ lại với giá trị mới. Bạn chỉ khai báo <em>giá trị đích</em>, còn Compose lo phần chạy từ giá trị hiện tại đến đích. Nếu đích đổi giữa chừng, animation sẽ chuyển hướng mượt mà, không bị giật.</p>
+    <p>Với hệ View cũ, bạn phải tạo <code>ValueAnimator</code>/<code>ObjectAnimator</code>, gắn listener, nhớ hủy khi view bị gỡ, và dùng <code>TransitionManager</code> để làm hiệu ứng hiện/ẩn. Compose gói tất cả vào vài composable và hàm như <code>animate*AsState</code>, <code>AnimatedVisibility</code>, <code>AnimatedContent</code>, và chúng tự dừng khi composable rời khỏi màn hình.</p>
+    <p>Mỗi animation có một <strong>AnimationSpec</strong>, tức là "công thức chuyển động": chạy trong bao lâu, nhanh dần hay chậm dần, có nảy hay không. Nếu bạn không chỉ định, phần lớn API dùng <code>spring()</code>, một chuyển động mô phỏng lò xo cho cảm giác tự nhiên.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>1. Chọn API theo mục đích</h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Bạn muốn…</th><th>Dùng</th></tr></thead>
+      <tbody>
+        <tr><td>Đổi mượt <strong>một giá trị</strong> (màu, kích thước, độ mờ, góc xoay)</td><td><code>animateColorAsState</code>, <code>animateDpAsState</code>, <code>animateFloatAsState</code>…</td></tr>
+        <tr><td><strong>Hiện/ẩn</strong> một phần giao diện</td><td><code>AnimatedVisibility</code></td></tr>
+        <tr><td><strong>Đổi nội dung</strong> này sang nội dung khác</td><td><code>AnimatedContent</code> (tùy biến được), <code>Crossfade</code> (chỉ mờ dần)</td></tr>
+        <tr><td>Khung tự <strong>co giãn</strong> mượt khi nội dung đổi kích thước</td><td><code>Modifier.animateContentSize()</code></td></tr>
+        <tr><td>Nhiều giá trị cùng đổi theo <strong>một trạng thái chung</strong></td><td><code>updateTransition</code> (xem <a href="#animation-nang-cao">Animation nâng cao</a>)</td></tr>
+        <tr><td>Hiệu ứng <strong>lặp mãi</strong> (nhấp nháy, xoay vòng)</td><td><code>rememberInfiniteTransition</code></td></tr>
+        <tr><td>Thêm/xóa/sắp xếp item trong danh sách</td><td><code>Modifier.animateItem()</code> trong <code>LazyColumn</code> (xem <a href="#lazy-list">Lazy list</a>)</td></tr>
+      </tbody>
+    </table></div>
+
+    <h4>2. animate*AsState: đổi một giá trị</h4>
+    <p>Truyền giá trị đích vào hàm, bạn nhận lại một <code>State</code> chạy dần đến đích. Đặt <code>label</code> để dễ nhận ra animation này trong công cụ Animation Preview của Android Studio.</p>
+    <pre><code class="language-kotlin">var selected by remember { mutableStateOf(false) }
+
+val corner by animateDpAsState(
+    targetValue = if (selected) 28.dp else 8.dp,
+    label = "corner"
+)
+val background by animateColorAsState(
+    targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer
+                  else MaterialTheme.colorScheme.surfaceContainer,
+    label = "background"
+)
+val alpha by animateFloatAsState(
+    targetValue = if (selected) 1f else 0.6f,
+    animationSpec = tween(durationMillis = 300),
+    label = "alpha"
+)</code></pre>
+    <p>Có sẵn các phiên bản cho nhiều kiểu dữ liệu: <code>animateIntAsState</code>, <code>animateOffsetAsState</code>, <code>animateSizeAsState</code>… Kiểu tự định nghĩa thì dùng <code>animateValueAsState</code>.</p>
+
+    <h4>3. AnimatedVisibility: hiện và ẩn</h4>
+    <p>Hiệu ứng vào (<code>enter</code>) và ra (<code>exit</code>) được ghép bằng dấu <code>+</code>. Các hiệu ứng vào gồm <code>fadeIn</code>, <code>slideInVertically</code>, <code>expandVertically</code>, <code>scaleIn</code>… Mỗi hiệu ứng vào có một hiệu ứng ra tương ứng: <code>fadeOut</code>, <code>slideOutVertically</code>, <code>shrinkVertically</code>, <code>scaleOut</code>…</p>
+    <pre><code class="language-kotlin">@Composable
+fun OfflineBanner(isOffline: Boolean, modifier: Modifier = Modifier) {
+    AnimatedVisibility(
+        visible = isOffline,
+        enter = fadeIn() + expandVertically(),
+        exit = fadeOut() + shrinkVertically(),
+        modifier = modifier
+    ) {
+        Surface(color = MaterialTheme.colorScheme.errorContainer) {
+            Text(
+                text = "Mất kết nối mạng",
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.fillMaxWidth().padding(12.dp)
+            )
+        }
+    }
+}</code></pre>
+
+    <h4>4. AnimatedContent và Crossfade: đổi nội dung</h4>
+    <p><code>AnimatedContent(targetState) { state -&gt; … }</code> vẽ lại nội dung mỗi khi <code>targetState</code> đổi, đồng thời chạy hiệu ứng chuyển giữa nội dung cũ và mới. Tham số <code>transitionSpec</code> mô tả hiệu ứng đó, ví dụ <code>fadeIn() togetherWith fadeOut()</code> (nội dung mới hiện dần <em>cùng lúc</em> nội dung cũ mờ đi). <code>Crossfade</code> là phiên bản đơn giản hơn, chỉ có hiệu ứng mờ chéo.</p>
+    <pre><code class="language-kotlin">enum class Weather { SUNNY, RAINY, CLOUDY }
+
+@Composable
+fun WeatherIcon(weather: Weather) {
+    Crossfade(targetState = weather, label = "weatherIcon") { current -&gt;
+        val icon = when (current) {
+            Weather.SUNNY -&gt; R.drawable.ic_sunny
+            Weather.RAINY -&gt; R.drawable.ic_rainy
+            Weather.CLOUDY -&gt; R.drawable.ic_cloudy
+        }
+        Icon(painterResource(icon), contentDescription = current.name, modifier = Modifier.size(48.dp))
+    }
+}</code></pre>
+
+    <h4>5. animateContentSize: tự co giãn</h4>
+    <p>Gắn <code>Modifier.animateContentSize()</code> vào khung chứa. Khi nội dung bên trong làm khung to lên hay nhỏ lại, kích thước khung sẽ đổi mượt thay vì nhảy đột ngột.</p>
+
+    <h4>6. AnimationSpec: chuyển động ra sao</h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Spec</th><th>Đặc điểm</th><th>Ví dụ</th></tr></thead>
+      <tbody>
+        <tr><td><code>spring(dampingRatio, stiffness)</code></td><td>Mô phỏng lò xo, không cố định thời gian. <code>dampingRatio</code> quyết định độ nảy (<code>Spring.DampingRatioMediumBouncy</code>…), <code>stiffness</code> quyết định độ nhanh (<code>Spring.StiffnessLow</code>…). Khi bị ngắt giữa chừng, nó vẫn giữ quán tính nên trông tự nhiên nhất. Đây là spec mặc định.</td><td><code>spring(dampingRatio = Spring.DampingRatioMediumBouncy)</code></td></tr>
+        <tr><td><code>tween(durationMillis, delayMillis, easing)</code></td><td>Chạy đúng số mili giây bạn đặt (mặc định 300ms), theo một đường cong tốc độ (easing) như <code>FastOutSlowInEasing</code>, <code>LinearEasing</code>, <code>LinearOutSlowInEasing</code>.</td><td><code>tween(250, easing = LinearEasing)</code></td></tr>
+        <tr><td><code>keyframes { … }</code></td><td>Đặt giá trị cụ thể tại từng mốc thời gian, cú pháp <code>giáTrị at mốcMs</code>.</td><td><code>keyframes { durationMillis = 400; 1.3f at 150 }</code></td></tr>
+        <tr><td><code>repeatable</code> / <code>infiniteRepeatable</code></td><td>Lặp một spec khác một số lần hoặc lặp mãi, có thể chạy ngược lại (<code>RepeatMode.Reverse</code>).</td><td><code>infiniteRepeatable(tween(800), RepeatMode.Reverse)</code></td></tr>
+        <tr><td><code>snap()</code></td><td>Nhảy ngay đến đích, không có chuyển động.</td><td><code>snap()</code></td></tr>
+      </tbody>
+    </table></div>
+
+    <h4>7. rememberInfiniteTransition: lặp mãi</h4>
+    <pre><code class="language-kotlin">@Composable
+fun LoadingPlaceholder(modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "placeholder")
+    val pulse by transition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(animation = tween(800), repeatMode = RepeatMode.Reverse),
+        label = "placeholderAlpha"
+    )
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(80.dp)
+            .graphicsLayer { alpha = pulse }
+            .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.medium)
+    )
+}</code></pre>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>Ví dụ 1: Nút yêu thích đổi màu và nảy lên</h4>
+    <pre><code class="language-kotlin">@Composable
+fun FavoriteButton(
+    isFavorite: Boolean,
+    onToggle: () -&gt; Unit,
+    modifier: Modifier = Modifier
+) {
+    val tint by animateColorAsState(
+        targetValue = if (isFavorite) MaterialTheme.colorScheme.primary
+                      else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = tween(durationMillis = 250),
+        label = "favoriteTint"
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (isFavorite) 1.25f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "favoriteScale"
+    )
+
+    IconButton(onClick = onToggle, modifier = modifier) {
+        Icon(
+            painter = painterResource(
+                if (isFavorite) R.drawable.ic_favorite_filled else R.drawable.ic_favorite_border
+            ),
+            contentDescription = if (isFavorite) "Bỏ yêu thích" else "Yêu thích",
+            tint = tint,
+            // Đọc scale trong graphicsLayer: chỉ vẽ lại lớp, không đo/xếp lại bố cục
+            modifier = Modifier.graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun FavoriteButtonPreview() {
+    var liked by remember { mutableStateOf(false) }
+    MaterialTheme {
+        FavoriteButton(isFavorite = liked, onToggle = { liked = !liked })
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Bấm vào trái tim viền xám, nó chuyển dần sang màu chủ đạo, phóng to lên 1.25 lần với một cú nảy nhẹ như lò xo. Bấm lần nữa thì nó co về và xám lại. Nếu bấm liên tục thật nhanh, animation đổi hướng mượt mà, không bị giật.</p>
+
+    <h4>Ví dụ 2: Thẻ ghi chú "Xem thêm"</h4>
+    <pre><code class="language-kotlin">@Composable
+fun ExpandableNoteCard(title: String, body: String, modifier: Modifier = Modifier) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val arrowRotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        label = "arrowRotation"
+    )
+
+    Card(modifier = modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .clickable { expanded = !expanded }
+                .animateContentSize()
+                .padding(16.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                Icon(
+                    painter = painterResource(R.drawable.ic_expand_more),
+                    contentDescription = if (expanded) "Thu gọn" else "Xem thêm",
+                    modifier = Modifier.rotate(arrowRotation)
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = body,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = if (expanded) Int.MAX_VALUE else 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Ban đầu thẻ chỉ hiện 2 dòng nội dung, cuối dòng có dấu "…". Chạm vào thẻ thì thẻ dài ra mượt mà để hiện toàn bộ ghi chú, mũi tên xoay ngược lên. Chạm lần nữa thì thẻ co lại về 2 dòng.</p>
+
+    <h4>Ví dụ 3: Bộ đếm số lượng trong giỏ hàng, số trượt lên/xuống</h4>
+    <pre><code class="language-kotlin">@Composable
+fun QuantityStepper(modifier: Modifier = Modifier) {
+    var quantity by rememberSaveable { mutableIntStateOf(1) }
+
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        IconButton(onClick = { if (quantity &gt; 0) quantity-- }) {
+            Icon(painterResource(R.drawable.ic_remove), contentDescription = "Bớt một")
+        }
+
+        AnimatedContent(
+            targetState = quantity,
+            transitionSpec = {
+                // Tăng: số mới đi lên từ dưới. Giảm: số mới rơi xuống từ trên.
+                val direction = if (targetState &gt; initialState) 1 else -1
+                (slideInVertically { fullHeight -&gt; fullHeight * direction } + fadeIn())
+                    .togetherWith(slideOutVertically { fullHeight -&gt; -fullHeight * direction } + fadeOut())
+            },
+            contentAlignment = Alignment.Center,
+            label = "quantity"
+        ) { value -&gt;
+            // Dùng "value" của lambda, KHÔNG dùng biến quantity bên ngoài
+            Text(
+                text = "$value",
+                style = MaterialTheme.typography.headlineMedium,
+                modifier = Modifier.widthIn(min = 48.dp),
+                textAlign = TextAlign.Center
+            )
+        }
+
+        IconButton(onClick = { quantity++ }) {
+            Icon(painterResource(R.drawable.ic_add), contentDescription = "Thêm một")
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Ở giữa hai nút trừ và cộng là con số. Bấm "+" thì số cũ trượt lên và mờ đi, số mới trồi lên từ bên dưới. Bấm "−" thì hướng ngược lại. Giống đồng hồ cơ, người dùng thấy ngay số đang tăng hay giảm.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li><strong>Dùng tham số của lambda:</strong> trong <code>AnimatedContent</code> và <code>Crossfade</code>, phải vẽ theo giá trị mà lambda nhận được (<code>value</code>, <code>current</code>). Nếu dùng biến state bên ngoài, nội dung cũ đang mờ đi cũng sẽ hiện giá trị mới, và hiệu ứng trông sai.</li>
+      <li><strong>Thứ tự modifier:</strong> đặt <code>animateContentSize()</code> <em>trước</em> các modifier quy định kích thước như <code>size</code>, <code>height</code>, <code>defaultMinSize</code>. Nếu đặt sau, kích thước đã bị chốt cứng từ bên ngoài, nên thường bạn sẽ không thấy hiệu ứng.</li>
+      <li><strong>Hiệu năng:</strong> với phóng to, xoay, mờ hay dịch chuyển, hãy đọc giá trị animation bên trong <code>Modifier.graphicsLayer { … }</code>. Như vậy mỗi khung hình chỉ vẽ lại lớp hiển thị. Ngược lại, đổi <code>size</code>/<code>padding</code> bằng <code>animateDpAsState</code> sẽ buộc đo và xếp lại bố cục ở mỗi khung hình (xem <a href="#performance">Hiệu năng</a>).</li>
+      <li><strong>AnimatedVisibility gỡ hẳn nội dung</strong> khỏi cây giao diện sau khi ẩn xong, nên state bên trong (ví dụ chữ đang nhập) sẽ mất. Nếu chỉ muốn làm mờ mà vẫn giữ chỗ và giữ state, hãy animate <code>alpha</code>.</li>
+      <li><strong>Luôn đặt <code>label</code></strong> cho mọi animation. Không đặt thì code vẫn chạy, nhưng trong Animation Preview và Layout Inspector bạn sẽ chỉ thấy những cái tên chung chung, khó phân biệt.</li>
+      <li><strong>Giữ animation ngắn và có mục đích:</strong> chuyển động trên giao diện thường chỉ nên dài khoảng 150–400ms. Animation quá dài hoặc quá nhiều khiến app có cảm giác chậm.</li>
+    </ul>
+    <div class="callout tip"><strong>Mẹo:</strong> Muốn một phần tử có hiệu ứng xuất hiện ngay lần đầu màn hình hiện ra, hãy dùng <code>AnimatedVisibility(visibleState = remember { MutableTransitionState(false).apply { targetState = true } })</code>. Bản dùng <code>visible = true</code> sẽ không có animation vì giá trị không hề đổi.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/animation/introduction?hl=vi" target="_blank" rel="noopener">Animation trong Compose</a></p>
+</section>

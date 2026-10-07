@@ -1,0 +1,240 @@
+<section class="topic" id="column-row-box" data-title="Column, Row, Box">
+  <h2>Column, Row và Box</h2>
+  <p class="lead">Column, Row và Box là ba "khung xương" để sắp xếp mọi giao diện trong Compose: xếp dọc, xếp ngang và xếp chồng. Nắm chắc ba layout này là bạn đã dựng được phần lớn các màn hình thường gặp.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p>Nếu một hàm <code>@Composable</code> phát ra nhiều phần tử mà không đặt chúng trong layout nào, Compose sẽ vẽ tất cả chồng lên nhau ở góc trên bên trái. Để kiểm soát vị trí, bạn bọc các phần tử trong một <strong>layout chuẩn</strong> (standard layout):</p>
+    <ul>
+      <li><code>Column</code> – xếp các con theo chiều dọc, từ trên xuống dưới. Tương đương <code>LinearLayout</code> với <code>android:orientation="vertical"</code>.</li>
+      <li><code>Row</code> – xếp các con theo chiều ngang, từ đầu dòng đến cuối dòng. Tương đương <code>LinearLayout</code> nằm ngang.</li>
+      <li><code>Box</code> – đặt các con chồng lên nhau, con viết sau nằm trên con viết trước. Tương đương <code>FrameLayout</code>.</li>
+    </ul>
+    <p>Mỗi layout có một <strong>trục chính</strong> (main axis – hướng mà các con được xếp nối tiếp nhau) và một <strong>trục phụ</strong> (cross axis – hướng vuông góc). Cách phân bố các con dọc theo trục chính gọi là <em>arrangement</em>, còn cách căn chúng trên trục phụ gọi là <em>alignment</em>.</p>
+    <p>Khác với hệ thống View, lồng nhiều layout trong Compose không làm hiệu năng giảm mạnh, vì Compose chỉ đo mỗi phần tử một lần trong một lượt layout (xem <a href="#kich-thuoc-rang-buoc">Kích thước và ràng buộc</a>). Vì vậy bạn cứ thoải mái lồng Row trong Column, Box trong Row… miễn là code dễ đọc.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>Tham số sắp xếp của từng layout</h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Layout</th><th>Trục chính (arrangement)</th><th>Trục phụ (alignment)</th><th>Mặc định</th></tr></thead>
+      <tbody>
+        <tr><td><code>Column</code></td><td><code>verticalArrangement</code></td><td><code>horizontalAlignment</code></td><td><code>Arrangement.Top</code>, <code>Alignment.Start</code></td></tr>
+        <tr><td><code>Row</code></td><td><code>horizontalArrangement</code></td><td><code>verticalAlignment</code></td><td><code>Arrangement.Start</code>, <code>Alignment.Top</code></td></tr>
+        <tr><td><code>Box</code></td><td>(không có, các con chồng lên nhau)</td><td><code>contentAlignment</code></td><td><code>Alignment.TopStart</code></td></tr>
+      </tbody>
+    </table></div>
+    <p>Mẹo nhớ: tên tham số arrangement luôn trùng với hướng của layout (Column dọc → <code>verticalArrangement</code>), còn alignment là hướng còn lại.</p>
+
+    <h4>Các giá trị Arrangement</h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Giá trị</th><th>Dùng cho</th><th>Ý nghĩa</th></tr></thead>
+      <tbody>
+        <tr><td><code>Arrangement.Top</code></td><td>Column</td><td>Dồn tất cả các con lên phía trên (mặc định của Column).</td></tr>
+        <tr><td><code>Arrangement.Bottom</code></td><td>Column</td><td>Dồn tất cả các con xuống đáy.</td></tr>
+        <tr><td><code>Arrangement.Start</code> / <code>End</code></td><td>Row</td><td>Dồn về đầu dòng / cuối dòng; tự đảo chiều khi ngôn ngữ viết từ phải sang trái (RTL).</td></tr>
+        <tr><td><code>Arrangement.Center</code></td><td>Cả hai</td><td>Gom các con vào giữa trục chính.</td></tr>
+        <tr><td><code>Arrangement.SpaceBetween</code></td><td>Cả hai</td><td>Con đầu sát mép đầu, con cuối sát mép cuối, phần trống chia đều vào giữa các con.</td></tr>
+        <tr><td><code>Arrangement.SpaceAround</code></td><td>Cả hai</td><td>Mỗi con có khoảng trống bằng nhau ở hai bên, nên khoảng ở hai mép chỉ bằng một nửa khoảng giữa hai con.</td></tr>
+        <tr><td><code>Arrangement.SpaceEvenly</code></td><td>Cả hai</td><td>Mọi khoảng trống, kể cả hai mép, đều bằng nhau.</td></tr>
+        <tr><td><code>Arrangement.spacedBy(8.dp)</code></td><td>Cả hai</td><td>Chèn khoảng cách cố định giữa các con. Có biến thể nhận thêm alignment, ví dụ <code>spacedBy(8.dp, Alignment.CenterVertically)</code> để vừa giãn cách vừa căn giữa cả khối.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h4>Các giá trị Alignment</h4>
+    <ul>
+      <li>Trục ngang (<code>Alignment.Horizontal</code>, dùng cho Column): <code>Start</code>, <code>CenterHorizontally</code>, <code>End</code>.</li>
+      <li>Trục dọc (<code>Alignment.Vertical</code>, dùng cho Row): <code>Top</code>, <code>CenterVertically</code>, <code>Bottom</code>.</li>
+      <li>Hai chiều (<code>Alignment</code>, dùng cho Box): <code>TopStart</code>, <code>TopCenter</code>, <code>TopEnd</code>, <code>CenterStart</code>, <code>Center</code>, <code>CenterEnd</code>, <code>BottomStart</code>, <code>BottomCenter</code>, <code>BottomEnd</code>.</li>
+    </ul>
+
+    <h4>Modifier chỉ có trong scope</h4>
+    <p>Nội dung của Column, Row, Box được viết trong một <em>scope</em> (phạm vi) riêng: <code>ColumnScope</code>, <code>RowScope</code>, <code>BoxScope</code>. Mỗi scope mở khóa vài modifier đặc biệt mà bên ngoài không gọi được:</p>
+    <ul>
+      <li><code>Modifier.weight(1f)</code> (Row, Column): chia phần không gian còn lại theo tỉ lệ, giống <code>layout_weight</code>.</li>
+      <li><code>Modifier.align(...)</code>: căn riêng một con, ghi đè alignment chung. Trong Column nhận <code>Alignment.Horizontal</code>, trong Row nhận <code>Alignment.Vertical</code>, trong Box nhận <code>Alignment</code> hai chiều.</li>
+      <li><code>Modifier.matchParentSize()</code> (Box): con có kích thước đúng bằng Box, nhưng không tham gia quyết định kích thước của Box.</li>
+      <li><code>Modifier.alignByBaseline()</code> (Row): căn các <code>Text</code> cỡ chữ khác nhau theo cùng đường chân chữ.</li>
+    </ul>
+
+    <h4>Spacer – khoảng trống có chủ đích</h4>
+    <p><code>Spacer</code> là một composable rỗng chỉ chiếm chỗ. Dùng <code>Spacer(Modifier.height(16.dp))</code> trong Column hoặc <code>Spacer(Modifier.width(8.dp))</code> trong Row để tạo khoảng cách. Đặc biệt, <code>Spacer(Modifier.weight(1f))</code> trong Row sẽ "đẩy" các phần tử phía sau về cuối dòng.</p>
+    <pre><code class="language-kotlin">Row(modifier = Modifier.fillMaxWidth()) {
+    Text("Tổng cộng")
+    Spacer(Modifier.weight(1f))   // chiếm hết phần trống ở giữa
+    Text("250.000 đ")
+}</code></pre>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>1. Hàng liên hệ: avatar + tên + nút gọi</h4>
+    <p class="code-caption">Row chứa một Box tròn, một Column chiếm phần còn lại nhờ <code>weight</code>, và một nút ở cuối.</p>
+    <pre><code class="language-kotlin">@Composable
+fun ContactRow(
+    name: String,
+    phone: String,
+    onCallClick: () -&gt; Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Avatar: hình tròn với chữ cái đầu
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = name.take(1).uppercase(),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        }
+        Spacer(Modifier.width(16.dp))
+        // Tên và số điện thoại chiếm toàn bộ phần còn lại
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = name,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = phone,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        IconButton(onClick = onCallClick) {
+            Icon(
+                painter = painterResource(R.drawable.ic_call),
+                contentDescription = "Gọi $name"
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun ContactRowPreview() {
+    ContactRow(name = "Nguyễn Thu Hà", phone = "0912 345 678", onCallClick = {})
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Một hàng ngang: bên trái là vòng tròn màu chứa chữ "N", ở giữa là tên và số điện thoại màu nhạt hơn ngay bên dưới, nút điện thoại luôn nằm sát mép phải dù tên dài hay ngắn (tên quá dài sẽ bị cắt bằng dấu "…").</p>
+
+    <h4>2. Huy hiệu chồng lên ảnh sản phẩm bằng Box</h4>
+    <pre><code class="language-kotlin">@Composable
+fun ProductThumbnail(
+    discountPercent: Int,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .size(160.dp)
+            .clip(RoundedCornerShape(12.dp))
+    ) {
+        // Lớp dưới cùng: ảnh phủ kín Box
+        Image(
+            painter = painterResource(R.drawable.product_sneaker),
+            contentDescription = "Giày thể thao",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.matchParentSize()
+        )
+        // Lớp trên: nhãn giảm giá ở góc trên trái
+        Text(
+            text = "-$discountPercent%",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onError,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(8.dp)
+                .background(MaterialTheme.colorScheme.error, RoundedCornerShape(6.dp))
+                .padding(horizontal = 6.dp, vertical = 2.dp)
+        )
+        // Lớp trên cùng: biểu tượng yêu thích ở góc trên phải
+        Icon(
+            painter = painterResource(R.drawable.ic_favorite),
+            contentDescription = "Thêm vào yêu thích",
+            tint = Color.White,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(8.dp)
+                .size(24.dp)
+        )
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Ảnh vuông 160dp bo góc; nhãn đỏ "-20%" nằm ở góc trên trái, biểu tượng trái tim trắng ở góc trên phải, cả hai đè lên ảnh.</p>
+
+    <h4>3. Màn hình đăng nhập căn giữa</h4>
+    <pre><code class="language-kotlin">@Composable
+fun LoginScreen(
+    onLoginClick: (email: String, password: String) -&gt; Unit,
+    modifier: Modifier = Modifier
+) {
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp),
+        // Cách nhau 12dp và cả khối nằm giữa màn hình theo chiều dọc
+        verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(text = "Đăng nhập", style = MaterialTheme.typography.headlineMedium)
+        OutlinedTextField(
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("Email") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text("Mật khẩu") },
+            singleLine = true,
+            visualTransformation = PasswordVisualTransformation(),
+            modifier = Modifier.fillMaxWidth()
+        )
+        Button(
+            onClick = { onLoginClick(email, password) },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Đăng nhập")
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            TextButton(onClick = { /* mở màn quên mật khẩu */ }) { Text("Quên mật khẩu?") }
+            TextButton(onClick = { /* mở màn đăng ký */ }) { Text("Tạo tài khoản") }
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Tiêu đề, hai ô nhập, nút "Đăng nhập" rộng hết chiều ngang và hàng hai nút chữ được gom thành một khối nằm chính giữa màn hình; hai nút chữ bị đẩy về hai mép trái phải. Phần trạng thái <code>remember</code> được giải thích ở <a href="#state-remember">State và remember</a>.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li><strong>Arrangement chỉ có tác dụng khi còn chỗ trống.</strong> Một Column không có <code>fillMaxSize()</code>/<code>fillMaxHeight()</code> sẽ chỉ cao vừa đủ nội dung, nên <code>Arrangement.Center</code> hay <code>SpaceBetween</code> trông như không làm gì cả.</li>
+      <li><strong>Đừng nhầm trục.</strong> Column không có tham số <code>verticalAlignment</code>, Row không có <code>verticalArrangement</code>; viết nhầm sẽ báo lỗi biên dịch. Hãy nhớ: arrangement theo hướng của layout, alignment theo hướng còn lại.</li>
+      <li><strong>Modifier theo scope không dùng được ở ngoài.</strong> Gọi <code>Modifier.weight()</code> trong một hàm con không nằm trong <code>RowScope</code>/<code>ColumnScope</code> sẽ lỗi biên dịch. Cách đúng: để layout cha truyền modifier đã có <code>weight</code> vào tham số <code>modifier</code> của hàm con.</li>
+      <li><strong>Thứ tự vẽ trong Box là thứ tự viết code.</strong> Phần tử viết sau nằm trên. Nếu cần thay đổi mà không đảo code, dùng <code>Modifier.zIndex(1f)</code>.</li>
+      <li><strong>Column và Row không tự cuộn.</strong> Nội dung vượt quá màn hình sẽ bị cắt mất. Thêm <code>Modifier.verticalScroll(rememberScrollState())</code> cho nội dung ngắn, hoặc dùng <a href="#lazy-list">LazyColumn</a> cho danh sách dài.</li>
+      <li><strong>Ưu tiên Start/End thay cho Left/Right.</strong> <code>Alignment.Start</code>, <code>Arrangement.End</code>… tự đảo chiều với ngôn ngữ RTL như tiếng Ả Rập. Chỉ dùng <code>Arrangement.Absolute.Left</code> khi thật sự muốn cố định theo mép trái.</li>
+    </ul>
+    <div class="callout tip"><strong>Mẹo:</strong> Khi một màn hình bắt đầu lồng quá ba, bốn tầng, hãy tách từng khối thành hàm <code>@Composable</code> riêng (như <code>ContactRow</code> ở trên). Code dễ đọc hơn, dễ xem trước bằng <a href="#preview">@Preview</a> và dễ tái sử dụng.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/layouts/basics" target="_blank" rel="noopener">Compose layout basics</a></p>
+</section>

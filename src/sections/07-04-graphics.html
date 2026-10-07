@@ -1,0 +1,234 @@
+<section class="topic" id="graphics" data-title="Canvas &amp; đồ họa">
+  <h2>Canvas và đồ họa</h2>
+  <p class="lead">Khi component có sẵn không vẽ được thứ bạn muốn — vòng tiến độ riêng, biểu đồ, nền trang trí — bạn có thể tự vẽ từng hình, từng nét. Phần này giới thiệu <code>Canvas</code>, các lệnh vẽ, modifier vẽ, <code>Brush</code>, <code>Shape</code> và <code>graphicsLayer</code>.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p>Mọi thứ Compose hiển thị cuối cùng đều được vẽ lên một "tấm vải" (canvas). <code>Canvas(modifier) { … }</code> là composable cho bạn tự tay vẽ lên tấm vải đó. Bên trong khối lệnh, bạn ở trong <strong><code>DrawScope</code></strong> — phạm vi vẽ cung cấp kích thước vùng vẽ (<code>size</code>), điểm giữa (<code>center</code>) và hàng loạt hàm <code>drawXxx</code>. Trong hệ View, việc này tương đương tạo một lớp con của <code>View</code>, ghi đè <code>onDraw(Canvas)</code> và tự quản lý các đối tượng <code>Paint</code>; Compose gọn hơn nhiều: không cần lớp mới, màu và kiểu nét truyền thẳng vào từng lệnh.</p>
+    <p>Hệ tọa độ tính bằng <strong>pixel</strong> (không phải dp), gốc <code>(0, 0)</code> ở góc trên trái, trục x hướng sang phải, trục y hướng <em>xuống dưới</em>. Ngoài <code>Canvas</code>, bạn cũng có thể vẽ thêm lên bất kỳ composable nào bằng modifier vẽ (<code>drawBehind</code>, <code>drawWithContent</code>, <code>drawWithCache</code>), cắt theo hình dạng bằng <code>Shape</code> và biến đổi cả phần tử bằng <code>graphicsLayer</code>.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>Canvas và DrawScope</h4>
+    <ul>
+      <li><code>Canvas</code> không có kích thước nội tại: luôn đặt kích thước qua modifier (<code>size</code>, <code>fillMaxWidth().height(…)</code>…), nếu không vùng vẽ bằng 0 và chẳng thấy gì.</li>
+      <li>Trong <code>DrawScope</code>: <code>size.width</code>, <code>size.height</code>, <code>size.minDimension</code>, <code>center</code> (đều là px). Đổi dp sang px bằng <code>16.dp.toPx()</code> — được vì <code>DrawScope</code> biết mật độ màn hình.</li>
+      <li>Các khối biến đổi bọc quanh lệnh vẽ: <code>rotate(độ) { }</code>, <code>translate(left, top) { }</code>, <code>scale(tỉLệ) { }</code>, <code>inset(px) { }</code>, <code>clipRect { }</code>.</li>
+      <li>Mỗi lệnh vẽ nhận <code>color</code> <em>hoặc</em> <code>brush</code>, và <code>style</code>: <code>Fill</code> (tô kín, mặc định) hoặc <code>Stroke(width = …, cap = StrokeCap.Round)</code> (chỉ vẽ nét viền, đầu nét bo tròn).</li>
+    </ul>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Lệnh vẽ</th><th>Vẽ gì</th><th>Tham số chính</th></tr></thead>
+      <tbody>
+        <tr><td><code>drawRect</code></td><td>Hình chữ nhật</td><td><code>color</code>, <code>topLeft</code>, <code>size</code>, <code>style</code></td></tr>
+        <tr><td><code>drawRoundRect</code></td><td>Chữ nhật bo góc</td><td>như trên + <code>cornerRadius = CornerRadius(px)</code></td></tr>
+        <tr><td><code>drawCircle</code></td><td>Hình tròn</td><td><code>color</code>, <code>radius</code>, <code>center</code></td></tr>
+        <tr><td><code>drawLine</code></td><td>Đoạn thẳng</td><td><code>start</code>, <code>end</code>, <code>strokeWidth</code>, <code>cap</code></td></tr>
+        <tr><td><code>drawArc</code></td><td>Cung tròn / hình quạt</td><td><code>startAngle</code>, <code>sweepAngle</code>, <code>useCenter</code>, <code>topLeft</code>, <code>size</code></td></tr>
+        <tr><td><code>drawPath</code></td><td>Hình tự do từ <code>Path</code></td><td><code>path</code>, <code>color</code>, <code>style</code></td></tr>
+        <tr><td><code>drawImage</code></td><td>Ảnh bitmap</td><td><code>image</code> (<code>ImageBitmap</code>), <code>topLeft</code></td></tr>
+        <tr><td><code>drawText</code></td><td>Chữ</td><td><code>textMeasurer</code> (từ <code>rememberTextMeasurer()</code>), <code>text</code>, <code>topLeft</code>, <code>style</code></td></tr>
+      </tbody>
+    </table></div>
+    <p>Với <code>drawArc</code>: góc 0° nằm ở hướng 3 giờ và tăng theo chiều kim đồng hồ, nên muốn bắt đầu từ đỉnh (12 giờ) dùng <code>startAngle = -90f</code>. Lệnh vẽ sau nằm đè lên lệnh vẽ trước.</p>
+
+    <h4>Modifier vẽ</h4>
+    <ul>
+      <li><code>Modifier.drawBehind { }</code>: vẽ <em>phía sau</em> nội dung của composable (nền tùy chỉnh, gạch chân).</li>
+      <li><code>Modifier.drawWithContent { }</code>: tự quyết định thứ tự — gọi <code>drawContent()</code> để vẽ nội dung gốc, vẽ trước nó là "dưới", sau nó là "trên" (huy hiệu, lớp phủ).</li>
+      <li><code>Modifier.drawWithCache { }</code>: tạo trước các đối tượng tốn kém (<code>Brush</code>, <code>Path</code>) và chỉ tạo lại khi kích thước hoặc state đọc bên trong thay đổi; trả về <code>onDrawBehind { }</code> hoặc <code>onDrawWithContent { }</code>.</li>
+    </ul>
+    <pre><code class="language-kotlin">// Lớp phủ tối dần phía dưới ảnh để chữ trắng dễ đọc
+Modifier.drawWithCache {
+    val lopPhu = Brush.verticalGradient(
+        0.5f to Color.Transparent,
+        1f to Color.Black.copy(alpha = 0.7f)
+    )
+    onDrawWithContent {
+        drawContent()
+        drawRect(lopPhu)
+    }
+}
+
+// Chấm đỏ thông báo ở góc trên phải
+Modifier.drawWithContent {
+    drawContent()
+    drawCircle(Color.Red, radius = 5.dp.toPx(), center = Offset(size.width, 0f))
+}</code></pre>
+
+    <h4>Brush: tô màu chuyển sắc</h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Brush</th><th>Kiểu chuyển màu</th></tr></thead>
+      <tbody>
+        <tr><td><code>Brush.horizontalGradient(colors)</code></td><td>Trái sang phải</td></tr>
+        <tr><td><code>Brush.verticalGradient(colors)</code></td><td>Trên xuống dưới</td></tr>
+        <tr><td><code>Brush.linearGradient(colors, start, end)</code></td><td>Theo đường thẳng bất kỳ (mặc định chéo cả vùng)</td></tr>
+        <tr><td><code>Brush.radialGradient(colors, center, radius)</code></td><td>Tỏa tròn từ tâm ra ngoài</td></tr>
+        <tr><td><code>Brush.sweepGradient(colors, center)</code></td><td>Quét một vòng quanh tâm như kim đồng hồ</td></tr>
+      </tbody>
+    </table></div>
+    <p>Có thể chỉ định vị trí từng màu bằng cặp <code>0.3f to Color.Blue</code>. Brush dùng được trong lệnh vẽ (<code>drawRect(brush = …)</code>) và trong <code>Modifier.background(brush, shape)</code>.</p>
+
+    <h4>Shape và clip</h4>
+    <p><code>Shape</code> mô tả đường viền ngoài của phần tử: <code>RoundedCornerShape(16.dp)</code> (bo góc, có thể bo từng góc riêng bằng <code>topStart</code>, <code>bottomEnd</code>…), <code>CircleShape</code>, <code>CutCornerShape(8.dp)</code> (cắt vát góc) và <code>GenericShape</code> để tự vẽ bằng lệnh đường. Dùng shape với <code>Modifier.clip(shape)</code> (cắt nội dung), <code>background(color, shape)</code>, <code>border(width, color, shape)</code>.</p>
+    <pre><code class="language-kotlin">val HinhTamGiac = GenericShape { size, _ -&gt;
+    moveTo(size.width / 2f, 0f)
+    lineTo(size.width, size.height)
+    lineTo(0f, size.height)
+    close()
+}
+
+Box(Modifier.size(80.dp).clip(HinhTamGiac).background(Color(0xFFFFB300)))</code></pre>
+
+    <h4>graphicsLayer và shadow</h4>
+    <p><code>Modifier.graphicsLayer { }</code> biến đổi cả phần tử (và con của nó) khi vẽ, không làm thay đổi bố cục: <code>scaleX</code>/<code>scaleY</code> (phóng), <code>rotationZ</code> (xoay phẳng; <code>rotationX</code>/<code>rotationY</code> xoay 3D), <code>alpha</code> (độ mờ), <code>translationX</code>/<code>translationY</code> (dịch, px), <code>transformOrigin</code> (tâm biến đổi). <code>Modifier.shadow(elevation = 8.dp, shape = …)</code> đổ bóng theo hình dạng; đặt <em>trước</em> <code>background</code> trong chuỗi modifier.</p>
+    <pre><code class="language-kotlin">Modifier.graphicsLayer {
+    scaleX = 1.1f
+    scaleY = 1.1f
+    rotationZ = -8f
+    alpha = 0.9f
+    translationX = 12.dp.toPx()
+}</code></pre>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>Ví dụ 1: Vòng tiến độ mục tiêu bước chân</h4>
+    <pre><code class="language-kotlin">@Composable
+fun VongBuocChan(soBuoc: Int, mucTieu: Int, modifier: Modifier = Modifier) {
+    val tienDo by animateFloatAsState(
+        targetValue = (soBuoc.toFloat() / mucTieu).coerceIn(0f, 1f),
+        label = "tienDo"
+    )
+    // Đọc màu, kiểu chữ ở ngoài Canvas: khối vẽ không phải hàm @Composable
+    val mauNen = MaterialTheme.colorScheme.surfaceVariant
+    val mauChinh = MaterialTheme.colorScheme.primary
+    val kieuSo = MaterialTheme.typography.headlineMedium.copy(color = MaterialTheme.colorScheme.onSurface)
+    val measurer = rememberTextMeasurer()
+
+    Canvas(
+        modifier
+            .size(200.dp)
+            .semantics { contentDescription = "Đã đi $soBuoc trên $mucTieu bước" }
+    ) {
+        val doDay = 16.dp.toPx()
+        val gocTrenTrai = Offset(doDay / 2, doDay / 2)
+        val vungCung = Size(size.width - doDay, size.height - doDay)
+
+        drawArc(   // vòng nền đầy đủ
+            color = mauNen, startAngle = 0f, sweepAngle = 360f, useCenter = false,
+            topLeft = gocTrenTrai, size = vungCung, style = Stroke(width = doDay)
+        )
+        drawArc(   // phần đã đạt, bắt đầu từ đỉnh
+            color = mauChinh, startAngle = -90f, sweepAngle = 360f * tienDo, useCenter = false,
+            topLeft = gocTrenTrai, size = vungCung,
+            style = Stroke(width = doDay, cap = StrokeCap.Round)
+        )
+
+        val chu = measurer.measure(text = "$soBuoc", style = kieuSo)
+        drawText(
+            chu,
+            topLeft = Offset(center.x - chu.size.width / 2f, center.y - chu.size.height / 2f)
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun VongBuocChanPreview() {
+    VongBuocChan(soBuoc = 6500, mucTieu = 10000, modifier = Modifier.padding(16.dp))
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Một vòng tròn xám dày, phía trên là cung màu chủ đạo bo tròn hai đầu, bắt đầu từ đỉnh và chạy theo chiều kim đồng hồ khoảng 65% vòng; số "6500" nằm chính giữa. Khi <code>soBuoc</code> tăng, cung dài ra mượt mà.</p>
+
+    <h4>Ví dụ 2: Thẻ thành viên nền gradient</h4>
+    <pre><code class="language-kotlin">@Composable
+fun TheThanhVien(ten: String, hang: String, modifier: Modifier = Modifier) {
+    val hinhThe = RoundedCornerShape(20.dp)
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(180.dp)
+            .shadow(elevation = 8.dp, shape = hinhThe)
+            .background(
+                brush = Brush.linearGradient(listOf(Color(0xFF5B2EBF), Color(0xFF1E88E5))),
+                shape = hinhThe
+            )
+            .drawWithCache {
+                // Quầng sáng góc trên phải, chỉ tạo lại khi kích thước đổi
+                val quangSang = Brush.radialGradient(
+                    colors = listOf(Color.White.copy(alpha = 0.35f), Color.Transparent),
+                    center = Offset(size.width * 0.9f, 0f),
+                    radius = size.height
+                )
+                onDrawBehind { drawRect(quangSang) }
+            }
+            .padding(20.dp)
+    ) {
+        Text("THẺ THÀNH VIÊN", color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.labelLarge)
+        Column(Modifier.align(Alignment.BottomStart)) {
+            Text(ten, color = Color.White, style = MaterialTheme.typography.titleLarge)
+            Text("Hạng $hang", color = Color.White, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Một thẻ bo góc có bóng đổ, nền chuyển từ tím sang xanh dương theo đường chéo, góc trên phải có quầng sáng mờ; chữ trắng "THẺ THÀNH VIÊN" ở trên, tên và hạng ở góc dưới trái.</p>
+
+    <h4>Ví dụ 3: Biểu đồ cột bước chân trong tuần</h4>
+    <pre><code class="language-kotlin">@Composable
+fun BieuDoCot(duLieu: List&lt;Pair&lt;String, Float&gt;&gt;, modifier: Modifier = Modifier) {
+    val measurer = rememberTextMeasurer()
+    val mauCot = MaterialTheme.colorScheme.primary
+    val mauTruc = MaterialTheme.colorScheme.outline
+    val kieuNhan = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+    Canvas(modifier.fillMaxWidth().height(200.dp)) {
+        val giaTriLonNhat = duLieu.maxOf { it.second }
+        val vungNhan = 20.dp.toPx()
+        val dayBieuDo = size.height - vungNhan
+        val oRong = size.width / duLieu.size
+        val beRongCot = oRong * 0.6f
+
+        drawLine(mauTruc, Offset(0f, dayBieuDo), Offset(size.width, dayBieuDo), strokeWidth = 1.dp.toPx())
+
+        duLieu.forEachIndexed { i, (nhan, giaTri) -&gt;
+            val caoCot = dayBieuDo * (giaTri / giaTriLonNhat)
+            val trai = i * oRong + (oRong - beRongCot) / 2
+            drawRoundRect(
+                color = mauCot,
+                topLeft = Offset(trai, dayBieuDo - caoCot),
+                size = Size(beRongCot, caoCot),
+                cornerRadius = CornerRadius(6.dp.toPx())
+            )
+            val chu = measurer.measure(text = nhan, style = kieuNhan)
+            drawText(chu, topLeft = Offset(trai + (beRongCot - chu.size.width) / 2, dayBieuDo + 4.dp.toPx()))
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun BieuDoCotPreview() {
+    BieuDoCot(
+        listOf("T2" to 4200f, "T3" to 7800f, "T4" to 6100f, "T5" to 9500f,
+               "T6" to 3000f, "T7" to 11000f, "CN" to 8000f),
+        Modifier.padding(16.dp)
+    )
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Bảy cột bo góc trên một đường trục ngang, cột "T7" cao chạm đỉnh, các cột khác cao theo tỉ lệ; nhãn ngày nằm giữa ngay dưới mỗi cột.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li><strong>Px và dp.</strong> Mọi số trong <code>DrawScope</code> là pixel. Viết <code>strokeWidth = 4f</code> sẽ mảnh khác nhau trên từng máy; hãy dùng <code>4.dp.toPx()</code>.</li>
+      <li><strong>Không tạo <code>Path</code>/<code>Brush</code> mới mỗi khung hình.</strong> Khối vẽ có thể chạy rất nhiều lần (nhất là khi có animation). Tạo trong <code>drawWithCache</code> hoặc <code>remember</code> để tái sử dụng.</li>
+      <li><strong>Khối vẽ không phải <code>@Composable</code>.</strong> Không gọi được <code>MaterialTheme.colorScheme</code> hay <code>stringResource</code> bên trong; đọc ra biến ở ngoài <code>Canvas</code> như các ví dụ.</li>
+      <li><strong>Đọc state trong khối vẽ là có lợi:</strong> khi giá trị đổi, Compose chỉ vẽ lại, bỏ qua recompose và bố cục — rất hợp để vẽ giá trị animation (xem <a href="#vong-doi-giai-doan">Vòng đời và các giai đoạn</a>).</li>
+      <li><strong>Thứ tự modifier quyết định kết quả:</strong> <code>shadow</code> rồi <code>background</code> rồi <code>padding</code>; đặt <code>clip</code> sau <code>background</code> thì nền không bị cắt theo hình dạng.</li>
+      <li><strong>Canvas "câm" với trình đọc màn hình.</strong> Hình vẽ không có semantics; thêm <code>Modifier.semantics { contentDescription = … }</code> tóm tắt ý nghĩa (xem <a href="#accessibility">Hỗ trợ tiếp cận</a>).</li>
+    </ul>
+    <div class="callout tip"><strong>Mẹo:</strong> Cần xoay, phóng hay làm mờ cả một phần tử? Dùng <code>graphicsLayer</code> (hoặc các modifier ngắn <code>rotate</code>, <code>scale</code>, <code>alpha</code>) thay vì vẽ lại bằng Canvas — nhanh hơn và giữ nguyên bố cục.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/graphics/draw/overview?hl=vi" target="_blank" rel="noopener">Đồ họa trong Compose</a></p>
+</section>

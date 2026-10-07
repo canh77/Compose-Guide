@@ -1,0 +1,195 @@
+<section class="topic" id="lazy-grid" data-title="Lưới Lazy">
+  <h2>Lưới: LazyVerticalGrid và lưới so le</h2>
+  <p class="lead">Khi cần xếp nhiều phần tử thành nhiều cột, ví dụ sản phẩm trong cửa hàng, ảnh trong album hay biểu tượng ứng dụng, bạn dùng lưới lazy. Lưới lazy chỉ dựng những ô sắp hiện trên màn hình, nên vẫn cuộn mượt khi có hàng nghìn phần tử.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p><code>LazyVerticalGrid</code> là một danh sách <em>lazy</em> (chỉ tạo phần tử khi nó sắp xuất hiện) nhưng xếp phần tử thành <strong>nhiều cột</strong> và cuộn theo chiều dọc. Bản ngược lại là <code>LazyHorizontalGrid</code>: xếp thành <strong>nhiều hàng</strong> và cuộn ngang. Cả hai dùng chung cách viết với <a href="#lazy-list">LazyColumn/LazyRow</a>: bạn mô tả nội dung bằng <code>item { }</code> và <code>items(…) { }</code>, còn Compose lo việc đo đạc, tái sử dụng và dọn dẹp những ô đã cuộn khỏi màn hình.</p>
+    <p>Trong hệ View cũ, để làm lưới bạn cần <code>RecyclerView</code> + <code>GridLayoutManager</code> + Adapter + ViewHolder, và phải viết <code>SpanSizeLookup</code> nếu muốn một ô chiếm nhiều cột. Compose gói tất cả vào một hàm; việc "chiếm nhiều cột" chỉ là một tham số <code>span</code>.</p>
+    <p>Khi các ô có <strong>chiều cao khác nhau</strong> (kiểu Pinterest), lưới thường sẽ để lại khoảng trống xấu vì mỗi hàng cao bằng ô cao nhất. Lúc đó bạn dùng <code>LazyVerticalStaggeredGrid</code> – <em>lưới so le</em>: mỗi cột tự xếp chồng phần tử của nó, ô mới luôn được đặt vào cột đang thấp nhất, nên các ô khít nhau.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>1. Chọn cách chia cột bằng <code>GridCells</code></h4>
+    <p>Tham số bắt buộc là <code>columns</code> (với lưới dọc) hoặc <code>rows</code> (với lưới ngang). Có ba kiểu:</p>
+    <div class="table-wrap"><table>
+      <thead>
+        <tr><th>Kiểu</th><th>Cách hoạt động</th><th>Khi nào dùng</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>GridCells.Fixed(3)</code></td><td>Luôn đúng 3 cột; chiều rộng màn hình được chia đều cho 3 cột.</td><td>Số cột không đổi theo màn hình, ví dụ bàn phím số, lịch 7 cột.</td></tr>
+        <tr><td><code>GridCells.Adaptive(minSize = 150.dp)</code></td><td>Tạo nhiều cột nhất có thể sao cho mỗi cột rộng ít nhất 150dp; phần dư chia đều cho các cột.</td><td>Lưới sản phẩm, ảnh cần tự thích ứng điện thoại, máy tính bảng, xoay ngang. Thường là lựa chọn tốt nhất.</td></tr>
+        <tr><td><code>GridCells.FixedSize(size = 120.dp)</code></td><td>Mỗi cột rộng <strong>đúng</strong> 120dp; vừa bao nhiêu cột thì tạo bấy nhiêu, phần thừa được phân bổ theo <code>horizontalArrangement</code>.</td><td>Ô phải giữ kích thước chính xác, ví dụ ảnh đại diện, ô màu.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h4>2. Khoảng cách và lề</h4>
+    <ul>
+      <li><code>contentPadding</code>: lề bao quanh toàn bộ nội dung. Khác với <code>Modifier.padding</code>, phần lề này cuộn cùng nội dung nên ô không bị cắt ở mép.</li>
+      <li><code>verticalArrangement = Arrangement.spacedBy(12.dp)</code>: khoảng cách giữa các hàng.</li>
+      <li><code>horizontalArrangement = Arrangement.spacedBy(12.dp)</code>: khoảng cách giữa các cột.</li>
+      <li><code>state = rememberLazyGridState()</code>: dùng khi cần đọc vị trí cuộn hoặc cuộn bằng code (giống <code>LazyListState</code>).</li>
+    </ul>
+
+    <h4>3. <code>key</code>, <code>contentType</code> và <code>span</code></h4>
+    <p>Hàm <code>items</code> của lưới nhận thêm tham số <code>span</code> để quyết định một ô chiếm bao nhiêu cột. Bên trong lambda <code>span</code> bạn có <code>maxLineSpan</code> (tổng số cột của một hàng) và <code>maxCurrentLineSpan</code> (số cột còn trống ở hàng hiện tại).</p>
+    <p class="code-caption">Tiêu đề chiếm trọn một hàng, sản phẩm nổi bật chiếm 2 cột:</p>
+    <pre><code class="language-kotlin">LazyVerticalGrid(columns = GridCells.Fixed(2)) {
+    item(span = { GridItemSpan(maxLineSpan) }) {
+        Text("Bán chạy tuần này")
+    }
+    items(
+        items = products,
+        key = { it.id },
+        span = { product -&gt; GridItemSpan(if (product.featured) 2 else 1) }
+    ) { product -&gt;
+        ProductTile(product)
+    }
+}</code></pre>
+
+    <h4>4. Lưới so le</h4>
+    <p><code>LazyVerticalStaggeredGrid</code> dùng <code>StaggeredGridCells.Fixed</code>, <code>StaggeredGridCells.Adaptive</code> hoặc <code>StaggeredGridCells.FixedSize</code>, ý nghĩa giống bảng trên. Lưu ý hai khác biệt:</p>
+    <ul>
+      <li>Khoảng cách giữa các ô theo chiều dọc dùng <code>verticalItemSpacing = 8.dp</code> (kiểu <code>Dp</code>) thay vì <code>verticalArrangement</code>.</li>
+      <li>Để một ô chiếm cả hàng, dùng <code>StaggeredGridItemSpan.FullLine</code>. Với <code>item</code> bạn truyền thẳng giá trị (<code>span = StaggeredGridItemSpan.FullLine</code>); với <code>items</code> bạn truyền lambda nhận từng phần tử.</li>
+    </ul>
+    <p>Bản cuộn ngang tương ứng là <code>LazyHorizontalStaggeredGrid</code> (dùng <code>rows</code> và <code>horizontalItemSpacing</code>).</p>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>Ví dụ 1: Lưới sản phẩm tự thích ứng</h4>
+    <pre><code class="language-kotlin">data class Product(val id: Int, val name: String, val price: Int)
+
+@Composable
+fun ProductGrid(products: List&lt;Product&gt;, onProductClick: (Product) -&gt; Unit) {
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 150.dp),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        items(products, key = { it.id }) { product -&gt;
+            ProductCard(product, onClick = { onProductClick(product) })
+        }
+    }
+}
+
+@Composable
+fun ProductCard(product: Product, onClick: () -&gt; Unit) {
+    Card(onClick = onClick) {
+        // Ô vuông giữ chỗ cho ảnh sản phẩm
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .background(MaterialTheme.colorScheme.secondaryContainer)
+        )
+        Column(Modifier.padding(12.dp)) {
+            Text(
+                text = product.name,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = "%,d đ".format(product.price),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+@Preview(widthDp = 360, heightDp = 640)
+@Composable
+fun ProductGridPreview() {
+    val sample = List(12) { Product(id = it, name = "Sản phẩm số ${it + 1}", price = (it + 1) * 25_000) }
+    MaterialTheme { ProductGrid(sample, onProductClick = {}) }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Trên điện thoại dọc thấy 2 cột thẻ sản phẩm vuông vức, mỗi thẻ có ô ảnh, tên và giá. Xoay ngang hoặc mở trên máy tính bảng, lưới tự tăng lên 4–6 cột mà không cần sửa code.</p>
+
+    <h4>Ví dụ 2: Lưới chia theo danh mục, tiêu đề chiếm cả hàng</h4>
+    <pre><code class="language-kotlin">@Composable
+fun CategorizedGrid(sections: Map&lt;String, List&lt;Product&gt;&gt;) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        sections.forEach { (category, products) -&gt;
+            item(
+                key = "header-$category",
+                span = { GridItemSpan(maxLineSpan) },
+                contentType = "header"
+            ) {
+                Text(
+                    text = category,
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
+            items(products, key = { it.id }, contentType = { "product" }) { product -&gt;
+                ProductCard(product, onClick = {})
+            }
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Mỗi danh mục ("Áo", "Giày", "Phụ kiện"…) có một dòng tiêu đề trải hết bề ngang, bên dưới là các sản phẩm xếp 2 cột. Tiêu đề cuộn cùng lưới như một ô bình thường.</p>
+
+    <h4>Ví dụ 3: Thư viện ảnh so le kiểu Pinterest</h4>
+    <pre><code class="language-kotlin">data class Photo(val id: Int, val heightDp: Int, val color: Color)
+
+@Composable
+fun PhotoGallery(photos: List&lt;Photo&gt;) {
+    LazyVerticalStaggeredGrid(
+        columns = StaggeredGridCells.Adaptive(minSize = 140.dp),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(12.dp),
+        verticalItemSpacing = 8.dp,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        item(span = StaggeredGridItemSpan.FullLine) {
+            Text("Album Đà Lạt", style = MaterialTheme.typography.headlineSmall)
+        }
+        items(photos, key = { it.id }) { photo -&gt;
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(photo.heightDp.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(photo.color)
+            )
+        }
+    }
+}
+
+@Preview
+@Composable
+fun PhotoGalleryPreview() {
+    val colors = listOf(Color(0xFF90CAF9), Color(0xFFA5D6A7), Color(0xFFFFCC80), Color(0xFFCE93D8))
+    val heights = listOf(120, 200, 160, 240, 140)
+    val photos = List(20) { i -&gt; Photo(id = i, heightDp = heights[i % heights.size], color = colors[i % colors.size]) }
+    MaterialTheme { PhotoGallery(photos) }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Dòng tiêu đề "Album Đà Lạt" nằm trên cùng, bên dưới là các khối màu cao thấp khác nhau xếp khít vào 2 cột (hoặc nhiều hơn trên màn hình rộng), không có khoảng trống giữa các ô. Trong app thật, bạn thay <code>Box</code> bằng ảnh tải từ mạng (ví dụ thư viện Coil).</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li><strong>Không lồng lưới lazy cuộn dọc vào vùng cuộn dọc khác</strong> (<code>Column</code> có <code>verticalScroll</code>, hoặc bên trong <code>LazyColumn</code>). Lưới sẽ nhận chiều cao "vô hạn" và app bị crash. Muốn có phần đầu trang phía trên lưới, hãy đưa nó vào lưới dưới dạng <code>item</code> với <code>span</code> chiếm cả hàng.</li>
+      <li><strong>Luôn truyền <code>key</code> ổn định và duy nhất trong toàn lưới</strong>, kể cả các dòng tiêu đề (như <code>"header-$category"</code> ở ví dụ 2). Key trùng nhau sẽ làm app crash; thiếu key thì trạng thái của ô có thể "nhảy" sang ô khác khi danh sách thay đổi.</li>
+      <li>Khi lưới có nhiều loại ô (tiêu đề, sản phẩm, quảng cáo…), khai báo <code>contentType</code> để Compose chỉ tái sử dụng ô cùng loại, giúp cuộn mượt hơn.</li>
+      <li>Ưu tiên <code>GridCells.Adaptive</code> thay cho <code>Fixed</code> để giao diện đẹp trên mọi kích thước màn hình. Xem thêm <a href="#adaptive">Giao diện thích ứng</a>.</li>
+      <li>Với lưới so le, hãy biết trước tỉ lệ khung ảnh (thường server trả về chiều rộng/cao) và đặt <code>Modifier.aspectRatio(…)</code> cho ô. Nếu để ô tự co theo ảnh vừa tải xong, cả lưới sẽ bị nhảy vị trí khi người dùng đang cuộn.</li>
+      <li>Muốn ô có hiệu ứng khi thêm, xóa, đổi chỗ, gắn <code>Modifier.animateItem()</code> cho phần tử ngay trong <code>items { }</code>, giống như với <code>LazyColumn</code>.</li>
+    </ul>
+    <div class="callout info"><strong>Lưu ý:</strong> Nếu chỉ có vài chục phần tử cố định và không cần cuộn lazy, các bản Compose gần đây còn có layout không-lazy mới là <em>Grid</em> và <em>FlexBox</em>; xem mục riêng của chúng trong <a href="https://developer.android.com/develop/ui/compose/layouts" target="_blank" rel="noopener">tài liệu Layouts</a>.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/lists" target="_blank" rel="noopener">Lists and grids</a></p>
+</section>

@@ -1,0 +1,245 @@
+<section class="topic" id="textfield" data-title="TextField">
+  <h2>TextField: nhận dữ liệu người dùng</h2>
+  <p class="lead">Ô nhập liệu là nơi người dùng gõ email, mật khẩu, nội dung ghi chú hay từ khóa tìm kiếm. Compose cung cấp <code>TextField</code> và các biến thể của nó, với cách quản lý nội dung qua một đối tượng state chuyên dụng.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p><code>TextField</code> là composable cho phép người dùng nhập và sửa chữ, tương đương <code>EditText</code> trong hệ thống View. Có ba lựa chọn chính:</p>
+    <ul>
+      <li><code>TextField</code>: kiểu Material 3 "filled" – nền tô màu, gạch chân phía dưới. Hợp với form trong thẻ, hộp thoại.</li>
+      <li><code>OutlinedTextField</code>: kiểu Material 3 có viền bao quanh, nền trong suốt. Hợp với form dài, màn hình đăng nhập.</li>
+      <li><code>BasicTextField</code>: phiên bản "trần" của tầng foundation, không có nhãn, viền hay màu Material. Dùng khi bạn muốn tự thiết kế giao diện ô nhập từ đầu.</li>
+    </ul>
+    <p>Cách được khuyến nghị hiện nay là <strong>dạng state</strong>: bạn tạo một <code>TextFieldState</code> bằng <code>rememberTextFieldState()</code> và truyền vào ô nhập. Đối tượng này tự giữ nội dung chữ <em>và</em> vùng chọn/vị trí con trỏ, tự cập nhật khi người dùng gõ, và tự lưu lại khi xoay màn hình hay khi hệ thống tạm hủy tiến trình (process death) nhờ cơ chế <code>rememberSaveable</code>. Bạn không còn phải tự viết <code>onValueChange</code> để chép từng ký tự vào biến, nên tránh được lỗi con trỏ nhảy lung tung hay mất ký tự khi gõ nhanh.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>Bước cơ bản</h4>
+    <ol>
+      <li>Tạo state: <code>val state = rememberTextFieldState()</code> (có thể truyền <code>initialText = "…"</code>).</li>
+      <li>Gắn vào ô nhập: <code>OutlinedTextField(state = state, label = { Text("Họ tên") })</code>.</li>
+      <li>Đọc nội dung bằng <code>state.text</code> (kiểu <code>CharSequence</code>, gọi <code>.toString()</code> khi cần <code>String</code>).</li>
+      <li>Đổi nội dung từ code: <code>state.setTextAndPlaceCursorAtEnd("…")</code> hoặc xóa sạch bằng <code>state.clearText()</code>.</li>
+    </ol>
+    <pre><code class="language-kotlin">@Composable
+fun NameField() {
+    val state = rememberTextFieldState()
+    Column {
+        OutlinedTextField(
+            state = state,
+            label = { Text("Họ tên") },
+            lineLimits = TextFieldLineLimits.SingleLine
+        )
+        Text("Bạn đã gõ: ${state.text}")
+    }
+}</code></pre>
+
+    <h4>Các tham số thường dùng</h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Tham số</th><th>Tác dụng</th></tr></thead>
+      <tbody>
+        <tr><td><code>label</code></td><td>Nhãn mô tả ô; nằm trong ô khi trống, thu nhỏ lên trên khi đang nhập</td></tr>
+        <tr><td><code>placeholder</code></td><td>Chữ gợi ý mờ, chỉ hiện khi ô đang trống và được focus</td></tr>
+        <tr><td><code>leadingIcon</code> / <code>trailingIcon</code></td><td>Icon ở đầu / cuối ô (ví dụ icon thư, nút xóa)</td></tr>
+        <tr><td><code>prefix</code> / <code>suffix</code></td><td>Chữ cố định dính trước / sau nội dung, như <code>+84</code> hoặc <code>đ</code></td></tr>
+        <tr><td><code>supportingText</code></td><td>Dòng chữ nhỏ bên dưới: hướng dẫn, bộ đếm ký tự, thông báo lỗi</td></tr>
+        <tr><td><code>isError</code></td><td><code>true</code> thì viền, nhãn, supportingText chuyển sang màu lỗi</td></tr>
+        <tr><td><code>lineLimits</code></td><td><code>TextFieldLineLimits.SingleLine</code> hoặc <code>TextFieldLineLimits.MultiLine(minHeightInLines = 3, maxHeightInLines = 6)</code></td></tr>
+        <tr><td><code>keyboardOptions</code></td><td>Loại bàn phím và nút hành động: <code>KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next)</code></td></tr>
+        <tr><td><code>onKeyboardAction</code></td><td>Việc cần làm khi bấm nút hành động trên bàn phím (Xong, Tiếp, Tìm…)</td></tr>
+        <tr><td><code>inputTransformation</code></td><td>Lọc/chỉnh dữ liệu người dùng gõ <em>trước khi</em> ghi vào state</td></tr>
+        <tr><td><code>outputTransformation</code></td><td>Định dạng cách <em>hiển thị</em> mà không đổi nội dung thật trong state</td></tr>
+        <tr><td><code>enabled</code> / <code>readOnly</code></td><td>Tắt hẳn ô (mờ đi) / chỉ cho xem và chọn, không cho sửa</td></tr>
+      </tbody>
+    </table></div>
+    <p>Mặc định, nút <code>ImeAction.Next</code> tự chuyển focus sang ô kế tiếp và <code>ImeAction.Done</code> ẩn bàn phím. Chỉ cần <code>onKeyboardAction</code> khi bạn muốn làm việc khác, ví dụ bấm "Xong" thì gửi form.</p>
+
+    <h4>inputTransformation: chặn dữ liệu sai ngay từ đầu</h4>
+    <p>Có sẵn <code>InputTransformation.maxLength(n)</code> để giới hạn độ dài. Bạn cũng tự viết được bộ lọc: bên trong khối lệnh, <code>asCharSequence()</code> là nội dung sau khi người dùng vừa gõ; gọi <code>revertAllChanges()</code> để hủy thay đổi đó. Nối nhiều bộ lọc bằng <code>.then(…)</code>.</p>
+    <pre><code class="language-kotlin">// Chỉ cho phép chữ số
+val DigitsOnly = InputTransformation {
+    if (!asCharSequence().all { it.isDigit() }) {
+        revertAllChanges()
+    }
+}
+
+@Composable
+fun OtpField() {
+    val state = rememberTextFieldState()
+    OutlinedTextField(
+        state = state,
+        label = { Text("Mã OTP (6 số)") },
+        inputTransformation = InputTransformation.maxLength(6).then(DigitsOnly),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPad),
+        lineLimits = TextFieldLineLimits.SingleLine
+    )
+}</code></pre>
+
+    <h4>outputTransformation: chỉ đổi cách hiển thị</h4>
+    <p>Ví dụ người dùng gõ <code>0912345678</code> nhưng bạn muốn hiện <code>0912 345 678</code> cho dễ đọc. Dữ liệu trong <code>state.text</code> vẫn là 10 chữ số liền nhau; Compose tự lo vị trí con trỏ.</p>
+    <pre><code class="language-kotlin">val PhoneFormat = OutputTransformation {
+    if (length == 10) {
+        insert(4, " ")
+        insert(8, " ")
+    }
+}</code></pre>
+
+    <h4>Mật khẩu: OutlinedSecureTextField</h4>
+    <p>Material 3 có <code>SecureTextField</code> và <code>OutlinedSecureTextField</code> (cũng nhận <code>state</code>), tự che ký tự bằng dấu chấm. Nên dùng chúng thay vì tự che chữ trong <code>TextField</code> thường.</p>
+    <pre><code class="language-kotlin">val passwordState = rememberTextFieldState()
+OutlinedSecureTextField(
+    state = passwordState,
+    label = { Text("Mật khẩu") }
+)</code></pre>
+
+    <h4>Quản lý focus</h4>
+    <ul>
+      <li><code>FocusRequester</code>: tạo bằng <code>remember { FocusRequester() }</code>, gắn qua <code>Modifier.focusRequester(…)</code>, rồi gọi <code>requestFocus()</code> để đưa con trỏ vào ô đó (ví dụ tự focus ô tìm kiếm khi mở màn hình).</li>
+      <li><code>LocalFocusManager.current.clearFocus()</code>: bỏ focus khỏi mọi ô, bàn phím ẩn theo. Hay gọi khi bấm nút gửi.</li>
+    </ul>
+
+    <h4>Dạng cũ: value / onValueChange</h4>
+    <p>Bạn sẽ gặp nhiều code viết <code>TextField(value = text, onValueChange = { text = it })</code> với <code>var text by rememberSaveable { mutableStateOf("") }</code>. Dạng này vẫn tồn tại và vẫn chạy, nhưng không còn là lựa chọn ưu tiên: bạn phải tự đồng bộ chữ, và nếu cập nhật trễ (qua coroutine, qua ViewModel bất đồng bộ) dễ gây mất ký tự, nhảy con trỏ. Code mới nên dùng dạng <code>state</code>.</p>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>Ví dụ 1: Ô tiêu đề ghi chú có bộ đếm ký tự</h4>
+    <pre><code class="language-kotlin">@Composable
+fun NoteTitleField(modifier: Modifier = Modifier) {
+    val maxChars = 50
+    val state = rememberTextFieldState()
+
+    TextField(
+        state = state,
+        label = { Text("Tiêu đề ghi chú") },
+        placeholder = { Text("Ví dụ: Việc cần làm cuối tuần") },
+        supportingText = { Text("${state.text.length}/$maxChars") },
+        inputTransformation = InputTransformation.maxLength(maxChars),
+        lineLimits = TextFieldLineLimits.SingleLine,
+        modifier = modifier.fillMaxWidth()
+    )
+}
+
+@Preview(showBackground = true)
+@Composable
+fun NoteTitleFieldPreview() {
+    MaterialTheme { NoteTitleField(Modifier.padding(16.dp)) }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Một ô nền tô màu, nhãn "Tiêu đề ghi chú". Khi gõ, bộ đếm phía dưới tăng dần "12/50"; tới 50 ký tự thì ô không nhận thêm chữ nữa.</p>
+
+    <h4>Ví dụ 2: Ô tìm kiếm danh bạ có nút xóa và theo dõi thay đổi</h4>
+    <p>Dùng <code>snapshotFlow { state.text }</code> trong <code>LaunchedEffect</code> để phản ứng mỗi khi chữ thay đổi. <code>collectLatest</code> kết hợp <code>delay</code> giúp chỉ tìm khi người dùng ngừng gõ 300 ms (xem thêm <a href="#side-effects">Side effects</a>).</p>
+    <pre><code class="language-kotlin">@Composable
+fun ContactSearchBox(onSearch: (String) -&gt; Unit, modifier: Modifier = Modifier) {
+    val state = rememberTextFieldState()
+    val currentOnSearch by rememberUpdatedState(onSearch)
+
+    LaunchedEffect(state) {
+        snapshotFlow { state.text.toString() }
+            .collectLatest { query -&gt;
+                delay(300) // chờ người dùng gõ xong
+                currentOnSearch(query.trim())
+            }
+    }
+
+    OutlinedTextField(
+        state = state,
+        placeholder = { Text("Tìm theo tên hoặc số điện thoại") },
+        leadingIcon = {
+            // ic_search: icon Material Symbols tải về res/drawable (tên giả định)
+            Icon(painterResource(R.drawable.ic_search), contentDescription = null)
+        },
+        trailingIcon = {
+            if (state.text.isNotEmpty()) {
+                IconButton(onClick = { state.clearText() }) {
+                    Icon(painterResource(R.drawable.ic_close), contentDescription = "Xóa từ khóa")
+                }
+            }
+        },
+        lineLimits = TextFieldLineLimits.SingleLine,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        modifier = modifier.fillMaxWidth()
+    )
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Ô viền có icon kính lúp bên trái. Khi bắt đầu gõ, nút "X" xuất hiện bên phải để xóa nhanh. Sau khi ngừng gõ khoảng 0,3 giây, <code>onSearch</code> được gọi với từ khóa mới nhất.</p>
+
+    <h4>Ví dụ 3: Form đăng nhập có kiểm tra email</h4>
+    <pre><code class="language-kotlin">import android.util.Patterns
+
+@Composable
+fun LoginForm(onLogin: (email: String, password: String) -&gt; Unit) {
+    val emailState = rememberTextFieldState()
+    val passwordState = rememberTextFieldState()
+    val focusManager = LocalFocusManager.current
+    val emailFocus = remember { FocusRequester() }
+
+    val email = emailState.text.toString().trim()
+    val emailInvalid = email.isNotEmpty() &amp;&amp; !Patterns.EMAIL_ADDRESS.matcher(email).matches()
+    val canSubmit = email.isNotEmpty() &amp;&amp; !emailInvalid &amp;&amp; passwordState.text.length &gt;= 6
+
+    LaunchedEffect(Unit) { emailFocus.requestFocus() }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text("Đăng nhập", style = MaterialTheme.typography.headlineSmall)
+
+        OutlinedTextField(
+            state = emailState,
+            label = { Text("Email") },
+            placeholder = { Text("ten@vidu.com") },
+            isError = emailInvalid,
+            supportingText = {
+                Text(if (emailInvalid) "Email chưa đúng định dạng" else "Email bạn đã dùng để đăng ký")
+            },
+            lineLimits = TextFieldLineLimits.SingleLine,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Email,
+                imeAction = ImeAction.Next
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(emailFocus)
+        )
+
+        OutlinedSecureTextField(
+            state = passwordState,
+            label = { Text("Mật khẩu (ít nhất 6 ký tự)") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Button(
+            onClick = {
+                focusManager.clearFocus()
+                onLogin(email, passwordState.text.toString())
+            },
+            enabled = canSubmit,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Đăng nhập")
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Mở màn hình là con trỏ nằm sẵn trong ô Email, bàn phím có ký tự "@". Gõ sai định dạng thì viền và dòng chú thích chuyển đỏ "Email chưa đúng định dạng". Bấm "Tiếp" trên bàn phím để nhảy xuống ô mật khẩu (chữ hiện thành dấu chấm). Nút "Đăng nhập" chỉ sáng khi email hợp lệ và mật khẩu đủ 6 ký tự; bấm nút thì bàn phím ẩn.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li><strong>Mỗi ô nhập cần một <code>TextFieldState</code> riêng</strong>; dùng chung một state cho hai ô thì gõ ô này, ô kia cũng đổi theo. Khi form phức tạp, có thể đặt <code>TextFieldState</code> trong ViewModel (xem <a href="#viewmodel">ViewModel</a>) để logic kiểm tra nằm ngoài giao diện.</li>
+      <li>Đọc <code>state.text</code> trực tiếp trong hàm composable sẽ khiến hàm đó vẽ lại mỗi lần gõ phím. Với logic nặng (gọi mạng, truy vấn CSDL), hãy dùng <code>snapshotFlow</code> như ví dụ 2 thay vì xử lý ngay trong thân hàm.</li>
+      <li>Nên luôn truyền <code>supportingText</code> (kể cả khi không lỗi) để tránh ô bị "giật" chiều cao khi dòng lỗi xuất hiện/biến mất.</li>
+      <li>Chọn đúng <code>keyboardType</code> (<code>Email</code>, <code>Phone</code>, <code>Number</code>, <code>Uri</code>…) giúp người dùng gõ nhanh hơn, nhưng nó <em>không</em> chặn dữ liệu sai: bàn phím ngoài hay dán (paste) vẫn đưa được chữ vào. Muốn chặn thật thì dùng <code>inputTransformation</code>.</li>
+      <li>Muốn có nút "hiện/ẩn mật khẩu", tìm hiểu tham số <code>textObfuscationMode</code> của <code>SecureTextField</code> thay vì tự viết lại cơ chế che chữ.</li>
+      <li><code>label</code> quan trọng cho trình đọc màn hình. Ô chỉ có <code>placeholder</code> mà không có <code>label</code> sẽ mất mô tả ngay khi người dùng bắt đầu gõ (xem <a href="#accessibility">Accessibility</a>).</li>
+    </ul>
+    <div class="callout warn"><strong>Cảnh báo:</strong> Khi dùng dạng cũ <code>value</code>/<code>onValueChange</code>, tuyệt đối không cập nhật biến chữ một cách bất đồng bộ (sau <code>delay</code>, trong <code>Flow</code> chậm). Ô nhập phải nhận lại giá trị mới ngay lập tức, nếu không người dùng sẽ thấy ký tự bị mất hoặc con trỏ nhảy về đầu.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/text/user-input?hl=vi" target="_blank" rel="noopener">Configure text fields</a></p>
+</section>

@@ -1,0 +1,166 @@
+<section class="topic" id="compose-la-gi" data-title="Compose là gì?">
+  <h2>Jetpack Compose là gì?</h2>
+  <p class="lead">Jetpack Compose là bộ công cụ hiện đại do Google phát triển để xây dựng giao diện Android gốc (native) hoàn toàn bằng Kotlin. Thay vì vẽ layout bằng XML rồi tự tay cập nhật từng View, bạn chỉ cần mô tả giao diện trông như thế nào ứng với dữ liệu hiện tại.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p><strong>Jetpack Compose</strong> là một <em>UI toolkit</em> (bộ công cụ dựng giao diện) theo phong cách <strong>khai báo</strong> (declarative). Giao diện được viết bằng các hàm Kotlin gắn annotation <code>@Composable</code>. Mỗi hàm nhận dữ liệu qua tham số và mô tả phần giao diện tương ứng; Compose lo phần còn lại: tạo, sắp xếp, vẽ và cập nhật các phần tử trên màn hình.</p>
+    <h4>Cách cũ: lập trình mệnh lệnh (imperative)</h4>
+    <p>Với hệ thống View truyền thống, bạn khai báo layout trong file XML, sau đó trong Activity phải "ra lệnh" từng bước: tìm View bằng <code>findViewById</code>, gọi <code>setText</code>, <code>setVisibility</code>, <code>setEnabled</code>… Mỗi khi dữ liệu thay đổi, bạn phải nhớ cập nhật <em>đúng tất cả</em> các View liên quan. Màn hình càng phức tạp thì càng dễ quên một chỗ, dẫn tới giao diện hiển thị lệch với dữ liệu thật.</p>
+    <h4>Cách mới: lập trình khai báo (declarative)</h4>
+    <p>Compose đảo ngược cách nghĩ: <strong>UI = f(state)</strong> — giao diện là kết quả của một hàm áp lên trạng thái (state, tức dữ liệu có thể thay đổi theo thời gian). Bạn không sửa View cũ; bạn mô tả lại giao diện cho trạng thái mới. Khi state thay đổi, Compose tự gọi lại những hàm có đọc state đó — quá trình này gọi là <strong>recomposition</strong> (tái tổ hợp) — và chỉ cập nhật phần thật sự khác. Chi tiết xem ở <a href="#tu-duy-compose">Tư duy trong Compose</a>.</p>
+    <div class="table-wrap"><table>
+      <thead>
+        <tr><th>Tiêu chí</th><th>View + XML</th><th>Jetpack Compose</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Ngôn ngữ mô tả giao diện</td><td>XML + Kotlin/Java</td><td>Chỉ Kotlin</td></tr>
+        <tr><td>Cập nhật giao diện</td><td>Tự gọi setter trên từng View</td><td>Tự động khi state đổi</td></tr>
+        <tr><td>Tái sử dụng</td><td>Custom View, <code>include</code>, kế thừa</td><td>Gọi lại hàm composable với tham số khác</td></tr>
+        <tr><td>Danh sách cuộn</td><td><code>RecyclerView</code> + Adapter + ViewHolder</td><td><code>LazyColumn</code> vài dòng</td></tr>
+        <tr><td>Xem trước</td><td>Layout Editor cho file XML</td><td><code>@Preview</code> ngay trên hàm Kotlin</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>Lợi ích chính</h4>
+    <ul>
+      <li><strong>Ít code hơn:</strong> không còn file XML, không cần <code>findViewById</code> hay ViewBinding, danh sách không cần Adapter.</li>
+      <li><strong>Kotlin thuần:</strong> dùng được <code>if</code>, <code>for</code>, <code>when</code>, hàm, lambda… ngay trong giao diện. Xem <a href="#kotlin-can-biet">Kotlin cần biết</a>.</li>
+      <li><strong>Xem trước nhanh:</strong> <a href="#preview"><code>@Preview</code></a> hiển thị giao diện ngay trong Android Studio, kể cả nhiều cấu hình (sáng/tối, cỡ chữ, kích thước màn hình) cùng lúc.</li>
+      <li><strong>Tương thích View:</strong> có thể nhúng Compose vào màn hình View cũ và ngược lại, nên chuyển đổi dần từng phần được. Xem <a href="#interop">Tương thích View</a>.</li>
+      <li><strong>Animation dễ:</strong> hiệu ứng chuyển động chỉ cần vài dòng như <code>AnimatedVisibility</code>, <code>animateDpAsState</code>. Xem <a href="#animation-co-ban">Animation cơ bản</a>.</li>
+      <li><strong>Material 3 có sẵn:</strong> các thành phần như <code>Button</code>, <code>Card</code>, <code>Scaffold</code> theo chuẩn thiết kế mới nhất. Xem <a href="#material3">Material 3</a>.</li>
+    </ul>
+    <h4>Các thư viện cấu thành Compose</h4>
+    <p>Compose không phải một khối duy nhất mà gồm nhiều thư viện xếp thành lớp; lớp trên xây dựng dựa trên lớp dưới. Thông thường bạn chỉ cần khai báo <code>material3</code> (nó kéo theo các lớp bên dưới), còn version của tất cả được đồng bộ bằng BOM — xem <a href="#thiet-lap-du-an">Thiết lập dự án</a>.</p>
+    <div class="table-wrap"><table>
+      <thead>
+        <tr><th>Thư viện (group)</th><th>Vai trò</th><th>API tiêu biểu</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>androidx.compose.runtime</code></td><td>Lõi của Compose: quản lý state, theo dõi thay đổi và recomposition</td><td><code>@Composable</code>, <code>remember</code>, <code>mutableStateOf</code></td></tr>
+        <tr><td><code>androidx.compose.ui</code></td><td>Nền tảng giao diện: đo, bố trí, vẽ, nhận thao tác chạm</td><td><code>Modifier</code>, <code>Layout</code>, <code>Modifier.drawBehind</code></td></tr>
+        <tr><td><code>androidx.compose.foundation</code></td><td>Khối xây dựng không phụ thuộc hệ thiết kế</td><td><code>Row</code>, <code>Column</code>, <code>Box</code>, <code>LazyColumn</code>, <code>Image</code></td></tr>
+        <tr><td><code>androidx.compose.material3</code></td><td>Thành phần theo Material Design 3, kèm theme</td><td><code>Button</code>, <code>Text</code>, <code>Scaffold</code>, <code>MaterialTheme</code></td></tr>
+        <tr><td><code>androidx.compose.animation</code></td><td>API chuyển động, được các lớp khác sử dụng</td><td><code>AnimatedVisibility</code>, <code>animate*AsState</code>, <code>Crossfade</code></td></tr>
+      </tbody>
+    </table></div>
+    <p>Ngoài ra còn <strong>Compose Compiler</strong> — một plugin của trình biên dịch Kotlin (<code>org.jetbrains.kotlin.plugin.compose</code>) biến các hàm <code>@Composable</code> thành mã mà runtime hiểu được.</p>
+    <h4>Điểm bắt đầu: <code>setContent</code></h4>
+    <ol>
+      <li>Activity kế thừa <code>ComponentActivity</code> (template mới đã làm sẵn).</li>
+      <li>Trong <code>onCreate</code>, gọi <code>setContent { … }</code> thay cho <code>setContentView(R.layout.…)</code>.</li>
+      <li>Bên trong khối <code>setContent</code>, gọi các hàm composable, thường bọc trong theme của app.</li>
+    </ol>
+    <div class="callout info"><strong>Lưu ý:</strong> Compose cũng có phiên bản đa nền tảng là <em>Compose Multiplatform</em> do JetBrains phát triển, cho phép dùng chung code giao diện trên Android, iOS, desktop và web. Hướng dẫn này chỉ tập trung vào Jetpack Compose cho Android.</div>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>Ví dụ 1: Hello World</h4>
+    <p class="code-caption">MainActivity.kt — app Compose nhỏ nhất</p>
+    <pre><code class="language-kotlin">// Hai import dễ nhầm: setContent và enableEdgeToEdge nằm trong androidx.activity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContent {
+            MaterialTheme {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    Text(
+                        text = "Xin chào Compose!",
+                        modifier = Modifier
+                            .safeDrawingPadding()
+                            .padding(16.dp)
+                    )
+                }
+            }
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Màn hình nền trắng (hoặc tối nếu máy bật chế độ tối), dòng chữ "Xin chào Compose!" ở góc trên bên trái, nằm ngay dưới thanh trạng thái chứ không bị che.</p>
+
+    <h4>Ví dụ 2: Màn hình "đếm số" theo cách cũ (XML + View)</h4>
+    <p class="code-caption">res/layout/activity_counter.xml</p>
+    <pre><code class="language-markup">&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center"
+    android:orientation="vertical"&gt;
+
+    &lt;TextView
+        android:id="@+id/countText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Đã bấm 0 lần" /&gt;
+
+    &lt;Button
+        android:id="@+id/plusButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Bấm tôi" /&gt;
+&lt;/LinearLayout&gt;</code></pre>
+    <p class="code-caption">CounterActivity.kt</p>
+    <pre><code class="language-kotlin">class CounterActivity : AppCompatActivity() {
+    private var count = 0
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_counter)
+
+        val countText = findViewById&lt;TextView&gt;(R.id.countText)
+        val plusButton = findViewById&lt;Button&gt;(R.id.plusButton)
+
+        plusButton.setOnClickListener {
+            count++
+            countText.text = "Đã bấm $count lần" // phải tự cập nhật View
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Một dòng chữ và một nút ở giữa màn hình; mỗi lần bấm, code tự tay đổi chữ của <code>TextView</code>.</p>
+
+    <h4>Ví dụ 3: Cùng màn hình đó viết bằng Compose</h4>
+    <pre><code class="language-kotlin">@Composable
+fun CounterScreen() {
+    var count by remember { mutableIntStateOf(0) }
+
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(text = "Đã bấm $count lần")
+        Button(onClick = { count++ }) {
+            Text("Bấm tôi")
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun CounterScreenPreview() {
+    CounterScreen()
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Giao diện giống hệt ví dụ 2. Khác biệt: không có XML, không có <code>findViewById</code>; nút chỉ tăng <code>count</code>, còn dòng chữ tự cập nhật vì nó đọc <code>count</code>.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li>Điều khó nhất khi chuyển sang Compose không phải cú pháp mà là <strong>cách nghĩ</strong>: đừng tìm cách "lấy View ra để sửa"; hãy thay đổi state và để giao diện tự vẽ lại. Đọc kỹ <a href="#tu-duy-compose">Tư duy trong Compose</a> và <a href="#state-remember">State và remember</a>.</li>
+      <li><code>remember</code> trong ví dụ 3 sẽ mất giá trị khi xoay màn hình (Activity bị tạo lại). Muốn giữ lại, dùng <code>rememberSaveable</code> — xem <a href="#luu-trang-thai">Lưu trạng thái</a>.</li>
+      <li>Bản <em>debug</em> của app Compose thường chạy chậm hơn đáng kể so với bản <em>release</em> đã bật R8. Đừng đánh giá hiệu năng trên bản debug — xem <a href="#performance">Hiệu năng</a>.</li>
+      <li>Chỉ dùng <code>androidx.compose.material3</code>; thư viện <code>androidx.compose.material</code> (Material 2) là thế hệ cũ, không nên trộn hai thư viện trong cùng một màn hình.</li>
+      <li>Không cần viết lại toàn bộ app: Compose và View sống chung được, bạn có thể bắt đầu bằng một màn hình mới hoặc một phần nhỏ của màn hình cũ.</li>
+    </ul>
+    <div class="callout tip"><strong>Mẹo:</strong> Khi đọc code Compose, hãy tự hỏi "hàm này hiển thị gì với dữ liệu này?" thay vì "khi nào thì View này bị thay đổi?". Câu hỏi đầu tiên chính là tư duy khai báo.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose?hl=vi" target="_blank" rel="noopener">Jetpack Compose</a>, <a href="https://developer.android.com/develop/ui/compose/layering?hl=vi" target="_blank" rel="noopener">Kiến trúc phân lớp của Compose</a></p>
+</section>

@@ -1,0 +1,245 @@
+<section class="topic" id="progress-snackbar" data-title="Progress &amp; Snackbar">
+  <h2>Chỉ báo tiến trình, Snackbar và kéo để làm mới</h2>
+  <p class="lead">Ba thành phần này giúp app "nói chuyện" với người dùng trong lúc làm việc: chỉ báo tiến trình cho biết đang chờ gì, Snackbar thông báo kết quả ngắn gọn (kèm nút "Hoàn tác"), còn kéo để làm mới cho phép người dùng chủ động tải lại dữ liệu.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p><strong>Chỉ báo tiến trình</strong> (progress indicator) có hai hình dạng: vòng tròn <code>CircularProgressIndicator</code> và thanh ngang <code>LinearProgressIndicator</code>. Mỗi loại có hai chế độ: <em>không xác định</em> (indeterminate — chạy liên tục vì chưa biết còn bao lâu) và <em>xác định</em> (determinate — hiển thị đúng phần trăm đã xong). Chúng tương ứng với <code>ProgressBar</code> trong XML.</p>
+    <p><strong>Snackbar</strong> là thanh thông báo ngắn hiện ở cạnh dưới màn hình rồi tự ẩn, có thể kèm một nút hành động. Khác <code>Toast</code> cũ, Snackbar nằm trong giao diện của bạn, theo theme và cho phép người dùng phản hồi (ví dụ "Hoàn tác"). Trong Compose, Snackbar được quản lý bởi một <code>SnackbarHostState</code> — đối tượng giữ hàng đợi thông báo — và hiển thị qua <code>SnackbarHost</code> đặt trong <a href="#scaffold">Scaffold</a>.</p>
+    <p><strong>Kéo để làm mới</strong> (pull to refresh) là cử chỉ kéo danh sách xuống từ đầu để tải lại dữ liệu, tương tự <code>SwipeRefreshLayout</code> của hệ View. Material 3 cung cấp sẵn <code>PullToRefreshBox</code>.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+
+    <h4>1. Progress indicator</h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th></th><th>Không xác định</th><th>Xác định</th></tr></thead>
+      <tbody>
+        <tr><td>Vòng tròn</td><td><code>CircularProgressIndicator()</code></td><td><code>CircularProgressIndicator(progress = { 0.6f })</code></td></tr>
+        <tr><td>Thanh ngang</td><td><code>LinearProgressIndicator()</code></td><td><code>LinearProgressIndicator(progress = { 0.6f })</code></td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li><strong>Xác định</strong> khi bạn biết tỷ lệ hoàn thành: tải/tải lên file, cài đặt nhiều bước, "bước 2 trên 5". Giá trị nằm trong khoảng <code>0f..1f</code>.</li>
+      <li><strong>Không xác định</strong> khi không biết sẽ mất bao lâu: gọi API, đăng nhập, tải trang đầu tiên.</li>
+      <li><strong>Vòng tròn</strong> hợp với chỗ nhỏ hoặc giữa vùng nội dung đang tải; <strong>thanh ngang</strong> hợp với đầu màn hình, dưới thanh tiêu đề hoặc trong một thẻ tải file.</li>
+    </ul>
+    <p><code>progress</code> là một <em>lambda</em> chứ không phải số trực tiếp: giá trị chỉ được đọc khi vẽ, nên khi tiến trình thay đổi, Compose chỉ cần vẽ lại thanh mà không phải chạy lại cả hàm composable (xem <a href="#vong-doi-giai-doan">Vòng đời và các giai đoạn</a>). Các tham số tùy biến hay dùng: <code>color</code>, <code>trackColor</code> (màu rãnh nền), <code>strokeWidth</code> (độ dày vòng tròn), <code>modifier</code> (ví dụ <code>Modifier.fillMaxWidth()</code> cho thanh ngang).</p>
+
+    <h4>2. Snackbar từng bước</h4>
+    <ol>
+      <li>Tạo host state một lần: <code>val snackbarHostState = remember { SnackbarHostState() }</code>.</li>
+      <li>Gắn vào Scaffold: <code>Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { … }</code>.</li>
+      <li>Lấy coroutine scope: <code>val scope = rememberCoroutineScope()</code>, vì <code>showSnackbar</code> là hàm <code>suspend</code> (xem <a href="#side-effects">Side effects</a>).</li>
+      <li>Trong sự kiện (ví dụ <code>onClick</code>): <code>scope.launch { val result = snackbarHostState.showSnackbar(...) }</code>.</li>
+      <li>Kiểm tra <code>result</code>: <code>SnackbarResult.ActionPerformed</code> (người dùng bấm nút hành động) hoặc <code>SnackbarResult.Dismissed</code> (tự ẩn hoặc bị vuốt đi).</li>
+    </ol>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Tham số của <code>showSnackbar</code></th><th>Ý nghĩa</th></tr></thead>
+      <tbody>
+        <tr><td><code>message</code></td><td>Nội dung thông báo, nên ngắn gọn một dòng.</td></tr>
+        <tr><td><code>actionLabel</code></td><td>Chữ trên nút hành động, ví dụ "Hoàn tác"; <code>null</code> thì không có nút.</td></tr>
+        <tr><td><code>withDismissAction</code></td><td><code>true</code> để thêm nút X cho người dùng tự đóng.</td></tr>
+        <tr><td><code>duration</code></td><td><code>SnackbarDuration.Short</code>, <code>Long</code> hoặc <code>Indefinite</code> (hiện đến khi bị đóng). Mặc định là <code>Short</code> nếu không có nút hành động, và <code>Indefinite</code> nếu có.</td></tr>
+      </tbody>
+    </table></div>
+    <p><code>showSnackbar</code> "treo" (suspend) cho đến khi snackbar biến mất rồi mới trả kết quả, nên code xử lý "Hoàn tác" chỉ cần viết ngay bên dưới.</p>
+
+    <h4>3. Kéo để làm mới với PullToRefreshBox</h4>
+    <pre><code class="language-kotlin">@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun RefreshableList(rows: List&lt;String&gt;, isRefreshing: Boolean, onRefresh: () -&gt; Unit) {
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize()
+    ) {
+        LazyColumn(Modifier.fillMaxSize()) {
+            items(rows) { Text(it, Modifier.padding(16.dp)) }
+        }
+    }
+}</code></pre>
+    <p><code>@OptIn(ExperimentalMaterial3Api::class)</code> xác nhận bạn dùng một API Material 3 còn được đánh dấu là có thể thay đổi. <code>PullToRefreshBox</code> không tự tải gì cả: nó gọi <code>onRefresh</code> khi người dùng kéo đủ xa, còn bạn chịu trách nhiệm đặt <code>isRefreshing = true</code>, tải dữ liệu, rồi đặt lại <code>false</code> để vòng xoay biến mất.</p>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+
+    <h4>Ví dụ 1: Thanh tiến trình tải file</h4>
+    <pre><code class="language-kotlin">import kotlin.math.roundToInt
+
+@Composable
+fun DownloadCard() {
+    var progress by remember { mutableFloatStateOf(0f) }
+    var isDownloading by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    // Làm mượt bước nhảy giữa các lần cập nhật
+    val animatedProgress by animateFloatAsState(targetValue = progress, label = "download")
+
+    OutlinedCard(Modifier.fillMaxWidth().padding(16.dp)) {
+        Column(Modifier.padding(16.dp)) {
+            Text("bao-cao-thang-9.pdf", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(12.dp))
+            LinearProgressIndicator(
+                progress = { animatedProgress },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = when {
+                        progress &gt;= 1f -&gt; "Đã tải xong"
+                        isDownloading -&gt; "Đang tải... ${(progress * 100).roundToInt()}%"
+                        else -&gt; "Chưa tải"
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                Button(
+                    enabled = !isDownloading,
+                    onClick = {
+                        scope.launch {
+                            isDownloading = true
+                            progress = 0f
+                            for (step in 1..20) {
+                                delay(150) // giả lập nhận thêm một phần dữ liệu
+                                progress = step / 20f
+                            }
+                            isDownloading = false
+                        }
+                    }
+                ) {
+                    Text(if (progress &gt;= 1f) "Tải lại" else "Tải xuống")
+                }
+            }
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Một thẻ có tên file, thanh tiến trình trống và dòng "Chưa tải". Bấm "Tải xuống", thanh đầy dần trong khoảng 3 giây, chữ chạy từ "Đang tải... 5%" đến 100% rồi đổi thành "Đã tải xong"; nút bị mờ trong lúc tải và sau đó thành "Tải lại".</p>
+
+    <h4>Ví dụ 2: Xóa ghi chú với Snackbar "Hoàn tác"</h4>
+    <pre><code class="language-kotlin">data class Note(val id: Int, val title: String)
+
+@Composable
+fun NotesWithUndo() {
+    val notes = remember {
+        mutableStateListOf(
+            Note(1, "Mua sữa cho bé"),
+            Note(2, "Gọi điện cho chủ nhà"),
+            Note(3, "Nộp báo cáo tuần"),
+            Note(4, "Đặt lịch khám răng")
+        )
+    }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
+    ) { innerPadding -&gt;
+        LazyColumn(contentPadding = innerPadding) {
+            items(notes, key = { it.id }) { note -&gt;
+                ListItem(
+                    headlineContent = { Text(note.title) },
+                    trailingContent = {
+                        IconButton(onClick = {
+                            val index = notes.indexOf(note)
+                            notes.removeAt(index)
+                            scope.launch {
+                                // Đóng snackbar cũ (nếu có) để thông báo mới hiện ngay
+                                snackbarHostState.currentSnackbarData?.dismiss()
+                                val result = snackbarHostState.showSnackbar(
+                                    message = "Đã xóa \"${note.title}\"",
+                                    actionLabel = "Hoàn tác",
+                                    duration = SnackbarDuration.Short
+                                )
+                                if (result == SnackbarResult.ActionPerformed) {
+                                    notes.add(index.coerceAtMost(notes.size), note)
+                                }
+                            }
+                        }) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_delete),
+                                contentDescription = "Xóa ${note.title}"
+                            )
+                        }
+                    }
+                )
+            }
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Bấm thùng rác ở một ghi chú, ghi chú biến mất khỏi danh sách và một thanh thông báo (ví dụ: Đã xóa "Nộp báo cáo tuần") kèm nút "Hoàn tác" trượt lên ở đáy màn hình. Bấm "Hoàn tác" trong vài giây, ghi chú quay lại đúng vị trí cũ; không bấm thì thanh tự ẩn.</p>
+
+    <h4>Ví dụ 3: Danh sách thời tiết kéo để làm mới</h4>
+    <pre><code class="language-kotlin">data class CityWeather(val city: String, val tempC: Int)
+
+// Giả lập gọi API thời tiết
+suspend fun fakeFetchWeather(): List&lt;CityWeather&gt; {
+    delay(1500)
+    return listOf("Hà Nội", "Đà Nẵng", "TP. Hồ Chí Minh", "Cần Thơ", "Đà Lạt")
+        .map { CityWeather(it, (16..36).random()) }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun WeatherScreen() {
+    var cities by remember { mutableStateOf(emptyList&lt;CityWeather&gt;()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    // Lần tải đầu tiên khi màn hình xuất hiện
+    LaunchedEffect(Unit) {
+        cities = fakeFetchWeather()
+        isLoading = false
+    }
+
+    if (isLoading) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+    } else {
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                isRefreshing = true
+                scope.launch {
+                    cities = fakeFetchWeather()
+                    isRefreshing = false
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        ) {
+            LazyColumn(Modifier.fillMaxSize()) {
+                items(cities, key = { it.city }) { item -&gt;
+                    ListItem(
+                        headlineContent = { Text(item.city) },
+                        trailingContent = {
+                            Text("${item.tempC}°C", style = MaterialTheme.typography.titleMedium)
+                        }
+                    )
+                    HorizontalDivider()
+                }
+            }
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Mở màn hình, một vòng tròn xoay ở giữa khoảng 1,5 giây, sau đó hiện danh sách 5 thành phố kèm nhiệt độ. Kéo danh sách xuống từ đầu, một vòng xoay nhỏ xuất hiện ở mép trên; khi dữ liệu mới về, vòng xoay thu lại và nhiệt độ các thành phố được cập nhật.</p>
+    <div class="callout tip"><strong>Mẹo:</strong> Trong app thật, phần gọi API và các cờ <code>isLoading</code>/<code>isRefreshing</code> nên nằm trong ViewModel, màn hình chỉ đọc state và gọi hàm — xem <a href="#viewmodel">ViewModel</a>.</div>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li>Dạng xác định hiện tại nhận <strong>lambda</strong>: viết <code>progress = { value }</code>. Dạng cũ truyền thẳng <code>Float</code> đã ngừng khuyến nghị và khiến hàm composable chạy lại mỗi lần giá trị đổi.</li>
+      <li>Đừng để chỉ báo quay mãi: mọi nhánh kết thúc (thành công, lỗi, hủy) đều phải tắt cờ đang tải. Với <code>PullToRefreshBox</code>, quên đặt <code>isRefreshing = false</code> là vòng xoay treo vĩnh viễn.</li>
+      <li><code>SnackbarHostState</code> phải được tạo trong <code>remember</code>, một lần cho mỗi màn hình. Viết <code>SnackbarHostState()</code> trần trong thân hàm sẽ tạo đối tượng mới mỗi lần recompose và làm mất thông báo đang hiện. Nếu thông báo xuất phát từ ViewModel, hãy để ViewModel phát sự kiện còn UI gọi <code>showSnackbar</code>.</li>
+      <li>Không gọi <code>showSnackbar</code> trực tiếp trong thân hàm composable. Dùng <code>scope.launch</code> trong callback, hoặc <code>LaunchedEffect</code> khi phản ứng với một state/sự kiện — xem <a href="#side-effects">Side effects</a>.</li>
+      <li>Có <code>actionLabel</code> mà không truyền <code>duration</code> thì snackbar mặc định là <code>Indefinite</code> — nó sẽ đứng đó đến khi người dùng bấm. Muốn tự ẩn, truyền rõ <code>SnackbarDuration.Short</code> hoặc <code>Long</code>.</li>
+      <li>Snackbar xếp hàng: gọi liên tiếp thì cái sau chờ cái trước ẩn. Muốn thay ngay, gọi <code>snackbarHostState.currentSnackbarData?.dismiss()</code> trước. Lỗi nghiêm trọng cần quyết định thì dùng dialog thay vì snackbar — xem <a href="#dialog-sheet-menu">Dialog, Sheet, Menu</a>.</li>
+      <li>Nội dung bên trong <code>PullToRefreshBox</code> phải là thành phần cuộn được (<code>LazyColumn</code> hoặc <code>Column</code> có <code>verticalScroll</code>) và nên <code>fillMaxSize()</code>; một <code>Column</code> thường không nhận cử chỉ kéo.</li>
+    </ul>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/components/progress" target="_blank" rel="noopener">Progress indicators</a>, <a href="https://developer.android.com/develop/ui/compose/components/snackbar" target="_blank" rel="noopener">Snackbar</a>, <a href="https://developer.android.com/develop/ui/compose/components/pull-to-refresh" target="_blank" rel="noopener">Pull to refresh</a></p>
+</section>

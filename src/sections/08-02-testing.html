@@ -1,0 +1,322 @@
+<section class="topic" id="testing" data-title="Kiểm thử UI">
+  <h2>Kiểm thử giao diện Compose</h2>
+  <p class="lead">Kiểm thử UI là viết code tự động "bấm thử" giao diện rồi kiểm tra kết quả, thay cho việc bạn tự mở app bấm từng nút sau mỗi lần sửa code. Compose có sẵn thư viện test giúp tìm phần tử, mô phỏng thao tác và xác nhận trạng thái màn hình chỉ với vài dòng.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p><strong>Test UI</strong> (UI test) kiểm tra rằng giao diện hiển thị và phản hồi đúng như người dùng mong đợi: bấm "Thêm" thì số lượng tăng, nhập mật khẩu quá ngắn thì hiện lỗi, cuộn danh sách thì thấy mục cuối. Test được viết một lần và chạy lại bao nhiêu lần cũng được, nhờ đó bạn phát hiện sớm <em>lỗi hồi quy</em> (regression, tức tính năng cũ bị hỏng vì một thay đổi mới).</p>
+    <p>Trong hệ View cũ, bạn dùng Espresso để tìm View theo id. Composable không có id hay đối tượng View riêng, nên thư viện test của Compose làm việc với <strong>cây semantics</strong> (semantics tree): một cây chạy song song với giao diện, mô tả <em>ý nghĩa</em> của từng phần tử như chữ hiển thị, mô tả cho trình đọc màn hình, có bấm được không, đang bật hay tắt. Đây cũng chính là cây mà các dịch vụ trợ năng sử dụng (xem <a href="#accessibility">Trợ năng</a>), vì vậy giao diện dễ test thường cũng dễ tiếp cận.</p>
+    <p>Test UI Compose thường nằm trong thư mục <code>src/androidTest</code>. Đây là <em>instrumented test</em>, chạy trên thiết bị thật hoặc emulator. Thư mục <code>src/test</code> dành cho unit test chạy trên JVM của máy tính, phù hợp với logic thuần như ViewModel.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+
+    <h4>1. Thêm thư viện test</h4>
+    <p class="code-caption">Trong <code>app/build.gradle.kts</code></p>
+    <pre><code class="language-kotlin">dependencies {
+    val composeBom = platform("androidx.compose:compose-bom:2026.09.00")
+    implementation(composeBom)
+    androidTestImplementation(composeBom)
+
+    // Thư viện test Compose dựa trên JUnit4
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    // Khai báo một Activity rỗng để createComposeRule() có chỗ hiển thị nội dung
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
+}</code></pre>
+    <div class="callout info"><strong>Lưu ý:</strong> <code>ui-test-manifest</code> chỉ cần khi dùng <code>createComposeRule()</code>. Nếu bạn dùng <code>createAndroidComposeRule&lt;MainActivity&gt;()</code> thì test chạy trên Activity thật của app nên không cần thư viện này. Khai báo bằng <code>debugImplementation</code> để nó không lọt vào bản release.</div>
+
+    <h4>2. Dùng API v2 thay cho v1</h4>
+    <p>Từ <code>ui-test-junit4</code> 1.11 có bộ API v2 nằm trong package <code>…junit4.v2</code>. Bộ v1 cũ đã bị đánh dấu deprecated (không khuyến khích dùng nữa).</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Tiêu chí</th><th>v1 (cũ)</th><th>v2 (nên dùng)</th></tr></thead>
+      <tbody>
+        <tr><td>Import</td><td><code>androidx.compose.ui.test.junit4.createComposeRule</code></td><td><code>androidx.compose.ui.test.junit4.v2.createComposeRule</code></td></tr>
+        <tr><td>Trạng thái</td><td>Deprecated</td><td>Có từ ui-test-junit4 1.11</td></tr>
+        <tr><td>Dispatcher cho coroutine</td><td><code>UnconfinedTestDispatcher</code></td><td><code>StandardTestDispatcher</code></td></tr>
+        <tr><td>Coroutine được khởi chạy (vd trong <code>LaunchedEffect</code>)</td><td>Chạy ngay lập tức</td><td>Được xếp hàng, chỉ chạy khi test cho đồng hồ ảo tiến lên</td></tr>
+      </tbody>
+    </table></div>
+    <p>Vì khác biệt về dispatcher, một số test cũ có thể fail sau khi đổi import sang v2: test kiểm tra kết quả ngay sau hành động, trong khi coroutine sinh ra kết quả đó vẫn đang chờ trong hàng đợi. Cách sửa: gọi <code>composeTestRule.waitForIdle()</code>, đặt phần kiểm tra trong <code>composeTestRule.runOnIdle { }</code>, hoặc tiến đồng hồ ảo trước khi assert (xem mục 6).</p>
+
+    <h4>3. Cấu trúc một test</h4>
+    <ol>
+      <li><strong>Rule</strong>: tạo <code>composeTestRule</code>, phần chuẩn bị môi trường Compose cho mỗi test.</li>
+      <li><strong>Dựng nội dung</strong>: <code>composeTestRule.setContent { }</code> hiển thị composable cần test.</li>
+      <li><strong>Tìm node</strong> (finder): xác định phần tử trong cây semantics.</li>
+      <li><strong>Hành động</strong> (action): bấm, gõ chữ, cuộn, vuốt.</li>
+      <li><strong>Kiểm tra</strong> (assertion): xác nhận trạng thái mong đợi.</li>
+    </ol>
+    <p class="code-caption">Khung chung của một file test (<code>GreetingCard</code> là composable của bạn)</p>
+    <pre><code class="language-kotlin">import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import org.junit.Rule
+import org.junit.Test
+
+class GreetingCardTest {
+
+    @get:Rule
+    val composeTestRule = createComposeRule()            // (1)
+
+    @Test
+    fun bamNutChao_hienLoiChao() {
+        composeTestRule.setContent {                       // (2)
+            GreetingCard()
+        }
+
+        composeTestRule.onNodeWithText("Chào")             // (3)
+            .performClick()                                // (4)
+
+        composeTestRule.onNodeWithText("Xin chào, Compose!")
+            .assertIsDisplayed()                           // (5)
+    }
+}</code></pre>
+
+    <h4>4. Các API hay dùng</h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Nhóm</th><th>API</th><th>Công dụng</th></tr></thead>
+      <tbody>
+        <tr><td>Tìm</td><td><code>onNodeWithText("Lưu")</code></td><td>Một node có đúng chữ "Lưu" (thêm <code>substring = true</code> để khớp một phần)</td></tr>
+        <tr><td>Tìm</td><td><code>onNodeWithTag("cart")</code></td><td>Node gắn <code>Modifier.testTag("cart")</code></td></tr>
+        <tr><td>Tìm</td><td><code>onNodeWithContentDescription("Xóa")</code></td><td>Node có mô tả trợ năng "Xóa" (thường là <code>Icon</code>, <code>Image</code>)</td></tr>
+        <tr><td>Tìm</td><td><code>onAllNodesWithText("Mới")</code></td><td>Nhiều node; dùng kèm <code>assertCountEquals(3)</code>, <code>onFirst()</code> hoặc <code>[0]</code></td></tr>
+        <tr><td>Tìm</td><td><code>onNode(hasText("Gửi") and hasClickAction())</code></td><td>Kết hợp nhiều điều kiện (matcher)</td></tr>
+        <tr><td>Kiểm tra</td><td><code>assertIsDisplayed()</code></td><td>Node đang hiện trên màn hình</td></tr>
+        <tr><td>Kiểm tra</td><td><code>assertExists()</code> / <code>assertDoesNotExist()</code></td><td>Node có / không có trong cây semantics</td></tr>
+        <tr><td>Kiểm tra</td><td><code>assertTextEquals("…")</code></td><td>Văn bản của node đúng bằng giá trị cho trước</td></tr>
+        <tr><td>Kiểm tra</td><td><code>assertIsEnabled()</code> / <code>assertIsNotEnabled()</code></td><td>Nút, ô nhập đang bật / tắt</td></tr>
+        <tr><td>Kiểm tra</td><td><code>assertIsOn()</code> / <code>assertIsOff()</code></td><td>Trạng thái <code>Switch</code>, <code>Checkbox</code></td></tr>
+        <tr><td>Hành động</td><td><code>performClick()</code></td><td>Bấm vào node</td></tr>
+        <tr><td>Hành động</td><td><code>performTextInput("abc")</code></td><td>Gõ chữ vào ô nhập</td></tr>
+        <tr><td>Hành động</td><td><code>performScrollTo()</code></td><td>Cuộn vùng chứa để node (đã có trong cây) hiện ra</td></tr>
+        <tr><td>Hành động</td><td><code>performScrollToNode(hasText("…"))</code></td><td>Gọi trên <code>LazyColumn</code> để cuộn tới item chưa được tạo</td></tr>
+        <tr><td>Hành động</td><td><code>performTouchInput { swipeLeft() }</code></td><td>Cử chỉ chạm: vuốt, nhấn giữ, chạm đúp…</td></tr>
+      </tbody>
+    </table></div>
+
+    <h4>5. Semantics, testTag và gỡ lỗi</h4>
+    <p>Khi chữ trên màn hình hay thay đổi hoặc bị trùng, hãy gắn nhãn riêng cho test bằng <code>Modifier.testTag("…")</code>. Một số composable như <code>Button</code> <em>gộp</em> (merge) semantics của các con vào chính nó, nên mặc định bạn tìm thấy node <code>Button</code> chứ không thấy <code>Text</code> bên trong. Truyền <code>useUnmergedTree = true</code> để tìm trong cây chưa gộp. Khi test không tìm thấy node, in cây semantics ra Logcat để xem thực tế có gì:</p>
+    <pre><code class="language-kotlin">// In cây đã gộp (mặc định), lọc Logcat theo tag "CAY_UI"
+composeTestRule.onRoot().printToLog("CAY_UI")
+
+// In cây chưa gộp để thấy cả Text nằm trong Button
+composeTestRule.onRoot(useUnmergedTree = true).printToLog("CAY_UI")
+
+// Tìm Text bên trong Button trong cây chưa gộp
+composeTestRule.onNodeWithText("Đăng nhập", useUnmergedTree = true).assertExists()</code></pre>
+
+    <h4>6. Đồng bộ hóa</h4>
+    <p>Mỗi lần tìm node hay kiểm tra, Compose test tự chờ đến khi giao diện <em>idle</em> (không còn recomposition, layout hay animation đang chờ). Vì thế bạn không cần <code>Thread.sleep()</code>. Với tác vụ chậm không do Compose quản lý (vd dữ liệu tải từ nơi khác), dùng <code>waitUntil</code>:</p>
+    <pre><code class="language-kotlin">composeTestRule.waitUntil(timeoutMillis = 5_000) {
+    composeTestRule
+        .onAllNodesWithText("Tải xong")
+        .fetchSemanticsNodes()
+        .isNotEmpty()
+}</code></pre>
+    <p>Khi cần kiểm tra trạng thái <em>giữa chừng</em> của animation hay một <code>delay</code>, hãy tự điều khiển đồng hồ ảo bằng <code>mainClock</code>:</p>
+    <pre><code class="language-kotlin">@Composable
+fun SavedBanner() {
+    var visible by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        delay(3_000)
+        visible = false
+    }
+    if (visible) Text("Đã lưu")
+}
+
+@Test
+fun banner_tuAnSauBaGiay() {
+    composeTestRule.mainClock.autoAdvance = false   // tắt tự tiến đồng hồ
+    composeTestRule.setContent { SavedBanner() }
+
+    composeTestRule.onNodeWithText("Đã lưu").assertIsDisplayed()
+
+    composeTestRule.mainClock.advanceTimeBy(3_100)  // tua nhanh 3,1 giây
+    composeTestRule.onNodeWithText("Đã lưu").assertDoesNotExist()
+}</code></pre>
+
+    <h4>7. Khi cần Activity thật hoặc string resource</h4>
+    <p>Dùng <code>createAndroidComposeRule&lt;MainActivity&gt;()</code> để chạy cả Activity của app (kèm theme, Hilt, điều hướng…) và truy cập <code>activity</code> để đọc resource. Khi đó <strong>không</strong> gọi <code>setContent</code> nếu Activity đã tự gọi trong <code>onCreate</code>.</p>
+    <pre><code class="language-kotlin">import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+
+class MainActivityTest {
+    @get:Rule
+    val composeTestRule = createAndroidComposeRule&lt;MainActivity&gt;()
+
+    @Test
+    fun manHinhChinh_hienTenApp() {
+        val appName = composeTestRule.activity.getString(R.string.app_name)
+        composeTestRule.onNodeWithText(appName).assertIsDisplayed()
+    }
+}</code></pre>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+
+    <h4>Ví dụ 1: Màn hình đếm số</h4>
+    <p class="code-caption">Composable cần test (trong <code>src/main</code>)</p>
+    <pre><code class="language-kotlin">@Composable
+fun CounterScreen() {
+    var count by rememberSaveable { mutableIntStateOf(0) }
+    Column(Modifier.padding(16.dp)) {
+        Text(
+            text = "Số lần bấm: $count",
+            modifier = Modifier.testTag("count_label")
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { count++ }) { Text("Tăng") }
+            Button(onClick = { count = 0 }, enabled = count &gt; 0) { Text("Đặt lại") }
+        }
+    }
+}</code></pre>
+    <p class="code-caption">Test (trong <code>src/androidTest</code>)</p>
+    <pre><code class="language-kotlin">class CounterScreenTest {
+    @get:Rule
+    val composeTestRule = createComposeRule()
+
+    @Test
+    fun lucDau_hienSoKhong_vaNutDatLaiBiTat() {
+        composeTestRule.setContent { CounterScreen() }
+
+        composeTestRule.onNodeWithTag("count_label").assertTextEquals("Số lần bấm: 0")
+        composeTestRule.onNodeWithText("Đặt lại").assertIsNotEnabled()
+    }
+
+    @Test
+    fun bamTangHaiLan_roiDatLai_quayVeKhong() {
+        composeTestRule.setContent { CounterScreen() }
+
+        composeTestRule.onNodeWithText("Tăng").performClick()
+        composeTestRule.onNodeWithText("Tăng").performClick()
+        composeTestRule.onNodeWithTag("count_label").assertTextEquals("Số lần bấm: 2")
+
+        composeTestRule.onNodeWithText("Đặt lại").assertIsEnabled().performClick()
+        composeTestRule.onNodeWithTag("count_label").assertTextEquals("Số lần bấm: 0")
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Hai test chạy trên emulator trong vài giây và báo xanh. Nếu sau này ai đó lỡ sửa nút "Đặt lại" thành luôn bật, test đầu tiên sẽ báo đỏ ngay.</p>
+
+    <h4>Ví dụ 2: Form đăng nhập stateless với state giả</h4>
+    <p>Composable <em>stateless</em> (không tự giữ state, xem <a href="#state-hoisting">State hoisting</a>) rất dễ test: bạn tự truyền dữ liệu vào và kiểm tra callback, không cần ViewModel hay mạng.</p>
+    <pre><code class="language-kotlin">@Composable
+fun LoginForm(
+    email: String,
+    password: String,
+    errorMessage: String?,
+    onEmailChange: (String) -&gt; Unit,
+    onPasswordChange: (String) -&gt; Unit,
+    onLoginClick: () -&gt; Unit
+) {
+    val canSubmit = email.isNotBlank() &amp;&amp; password.length &gt;= 6
+    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            value = email, onValueChange = onEmailChange,
+            label = { Text("Email") },
+            modifier = Modifier.testTag("email_input")
+        )
+        OutlinedTextField(
+            value = password, onValueChange = onPasswordChange,
+            label = { Text("Mật khẩu") },
+            visualTransformation = PasswordVisualTransformation(),
+            modifier = Modifier.testTag("password_input")
+        )
+        if (errorMessage != null) {
+            Text(errorMessage, color = MaterialTheme.colorScheme.error)
+        }
+        Button(onClick = onLoginClick, enabled = canSubmit) { Text("Đăng nhập") }
+    }
+}
+
+class LoginFormTest {
+    @get:Rule
+    val composeTestRule = createComposeRule()
+
+    @Test
+    fun nhapDuThongTin_nutDangNhapDuocBat() {
+        composeTestRule.setContent {
+            // State giả nằm ngay trong test
+            var email by remember { mutableStateOf("") }
+            var password by remember { mutableStateOf("") }
+            LoginForm(
+                email = email, password = password, errorMessage = null,
+                onEmailChange = { email = it }, onPasswordChange = { password = it },
+                onLoginClick = {}
+            )
+        }
+        composeTestRule.onNodeWithText("Đăng nhập").assertIsNotEnabled()
+
+        composeTestRule.onNodeWithTag("email_input").performTextInput("an@example.com")
+        composeTestRule.onNodeWithTag("password_input").performTextInput("123456")
+
+        composeTestRule.onNodeWithText("Đăng nhập").assertIsEnabled()
+    }
+
+    @Test
+    fun bamDangNhap_goiCallback() {
+        var clicked = false
+        composeTestRule.setContent {
+            LoginForm("an@example.com", "123456", null, {}, {}, onLoginClick = { clicked = true })
+        }
+        composeTestRule.onNodeWithText("Đăng nhập").performClick()
+        composeTestRule.runOnIdle { assertTrue(clicked) }
+    }
+
+    @Test
+    fun coLoi_hienThongBao() {
+        composeTestRule.setContent {
+            LoginForm("an@example.com", "123456", "Sai email hoặc mật khẩu", {}, {}, {})
+        }
+        composeTestRule.onNodeWithText("Sai email hoặc mật khẩu").assertIsDisplayed()
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Ba test lần lượt xác nhận: nút chỉ bật khi đủ dữ liệu, bấm nút thì callback được gọi, và thông báo lỗi hiện khi có <code>errorMessage</code>. <code>assertTrue</code> là của <code>org.junit.Assert</code>.</p>
+
+    <h4>Ví dụ 3: Cuộn danh sách tới một item</h4>
+    <pre><code class="language-kotlin">@Composable
+fun ProductList(products: List&lt;String&gt;) {
+    LazyColumn(Modifier.testTag("product_list")) {
+        items(products, key = { it }) { name -&gt;
+            Text(name, Modifier.padding(16.dp))
+        }
+    }
+}
+
+class ProductListTest {
+    @get:Rule
+    val composeTestRule = createComposeRule()
+
+    @Test
+    fun cuonToiSanPhamCuoi() {
+        val products = List(100) { "Sản phẩm số ${it + 1}" }
+        composeTestRule.setContent { ProductList(products) }
+
+        // Item cuối chưa được tạo nên chưa có trong cây semantics
+        composeTestRule.onNodeWithText("Sản phẩm số 100").assertDoesNotExist()
+
+        composeTestRule.onNodeWithTag("product_list")
+            .performScrollToNode(hasText("Sản phẩm số 100"))
+
+        composeTestRule.onNodeWithText("Sản phẩm số 100").assertIsDisplayed()
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Trên emulator, danh sách tự cuộn xuống cuối; test xác nhận "Sản phẩm số 100" hiện trên màn hình.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li><code>onNodeWithText</code> báo lỗi nếu có <strong>hơn một</strong> node khớp. Khi đó dùng <code>onAllNodesWithText</code>, thêm <code>testTag</code> hoặc kết hợp matcher để thu hẹp.</li>
+      <li><code>performScrollTo()</code> chỉ dùng cho node đã nằm trong cây (vd <code>Column</code> có <code>verticalScroll</code>). Với <code>LazyColumn</code>, item ngoài màn hình chưa được tạo, nên dùng <code>performScrollToNode</code> hoặc <code>performScrollToIndex</code> trên chính danh sách.</li>
+      <li>Chữ viết cứng trong test sẽ vỡ khi app đổi ngôn ngữ. Với app đa ngôn ngữ, đọc chuỗi qua <code>createAndroidComposeRule</code> + <code>activity.getString(...)</code> hoặc tìm theo <code>testTag</code>.</li>
+      <li>Không gọi <code>setContent</code> hai lần trong một test, và không gọi khi Activity của <code>createAndroidComposeRule</code> đã tự đặt nội dung.</li>
+      <li>Không dùng <code>Thread.sleep()</code> để chờ: test sẽ chậm và lúc chạy lúc không. Dùng <code>waitUntil</code>, <code>waitForIdle()</code> hoặc <code>mainClock</code>.</li>
+      <li>Thiết kế composable stateless và tách logic vào ViewModel: phần lớn logic test bằng unit test nhanh, test UI chỉ cần kiểm tra phần hiển thị.</li>
+    </ul>
+    <div class="callout tip"><strong>Mẹo:</strong> Bước tiếp theo sau test hành vi là <em>screenshot test</em>: chụp ảnh composable rồi so sánh với ảnh chuẩn để bắt lỗi giao diện (lệch màu, vỡ bố cục). Bạn có thể tìm hiểu công cụ Compose Preview Screenshot Testing của Android hoặc các thư viện cộng đồng như Roborazzi, Paparazzi.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/testing?hl=vi" target="_blank" rel="noopener">Kiểm thử bố cục Compose</a></p>
+</section>

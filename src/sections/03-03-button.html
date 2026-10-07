@@ -1,0 +1,271 @@
+<section class="topic" id="button" data-title="Button &amp; FAB">
+  <h2>Button và Floating Action Button</h2>
+  <p class="lead">Nút bấm là cách chính để người dùng ra lệnh cho app: thanh toán, lưu, xóa, thêm mới. Material 3 có nhiều loại nút với mức "nổi bật" khác nhau, giúp người dùng nhận ra ngay đâu là hành động quan trọng nhất.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p>Trong Compose, nút là một composable nhận hàm <code>onClick</code> và một <strong>slot</strong> nội dung (slot là tham số kiểu hàm composable, cho phép bạn đặt bất kỳ giao diện nào vào bên trong: chữ, icon, hoặc cả hai). Nhờ vậy không còn cảnh <code>Button</code>, <code>ImageButton</code>, <code>MaterialButton</code> với hàng loạt thuộc tính XML như hệ View cũ: chỉ cần chọn đúng loại nút rồi tự sắp xếp nội dung.</p>
+    <p>Material 3 chia nút theo <em>mức nhấn mạnh</em> (emphasis). Một màn hình thường chỉ có một hành động chính, dùng nút nổi bật nhất; các hành động phụ dùng nút nhẹ hơn. Ngoài ra còn có <code>IconButton</code> (nút chỉ có icon) và <strong>FAB</strong> (Floating Action Button – nút tròn/bo góc nổi phía trên nội dung, dành cho hành động quan trọng nhất của cả màn hình như "Soạn thư", "Thêm ghi chú").</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>Chọn loại nút theo mức nhấn mạnh</h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Composable</th><th>Giao diện</th><th>Khi nào dùng</th></tr></thead>
+      <tbody>
+        <tr><td><code>Button</code></td><td>Nền tô màu chủ đạo (primary), nổi bật nhất</td><td>Hành động chính: "Thanh toán", "Lưu", "Đăng nhập"</td></tr>
+        <tr><td><code>FilledTonalButton</code></td><td>Nền màu nhạt hơn (secondaryContainer)</td><td>Hành động quan trọng nhưng không phải chính: "Thêm vào giỏ" cạnh "Mua ngay"</td></tr>
+        <tr><td><code>ElevatedButton</code></td><td>Nền nhạt có đổ bóng</td><td>Khi nút cần tách khỏi nền có hoa văn, ảnh; dùng tiết chế</td></tr>
+        <tr><td><code>OutlinedButton</code></td><td>Chỉ có viền, nền trong suốt</td><td>Hành động phụ đi kèm nút chính: "Sửa", "Quay lại"</td></tr>
+        <tr><td><code>TextButton</code></td><td>Chỉ có chữ</td><td>Hành động ít quan trọng nhất: "Bỏ qua", "Hủy" trong hộp thoại</td></tr>
+      </tbody>
+    </table></div>
+
+    <h4>Tham số quan trọng</h4>
+    <ul>
+      <li><code>onClick</code>: hàm chạy khi bấm (bắt buộc).</li>
+      <li><code>enabled</code>: <code>false</code> thì nút mờ đi và không bấm được.</li>
+      <li><code>colors</code>: đổi màu bằng <code>ButtonDefaults.buttonColors(containerColor = …, contentColor = …)</code>. Mỗi loại nút có hàm tương ứng, ví dụ <code>ButtonDefaults.outlinedButtonColors(…)</code>, <code>ButtonDefaults.textButtonColors(…)</code>.</li>
+      <li><code>contentPadding</code>: khoảng đệm bên trong nút. Khi có icon nên dùng <code>ButtonDefaults.ButtonWithIconContentPadding</code>.</li>
+      <li><code>shape</code>, <code>border</code>, <code>elevation</code>: hình dạng, viền, độ nổi khi cần tùy biến.</li>
+      <li>Nội dung (lambda cuối): nằm trong một <code>Row</code>, nên đặt <code>Icon</code> và <code>Text</code> cạnh nhau là được. Dùng <code>ButtonDefaults.IconSize</code> cho cỡ icon và <code>ButtonDefaults.IconSpacing</code> cho khoảng cách icon–chữ để đúng chuẩn Material.</li>
+    </ul>
+    <pre><code class="language-kotlin">Button(
+    onClick = { /* xóa ghi chú */ },
+    colors = ButtonDefaults.buttonColors(
+        containerColor = MaterialTheme.colorScheme.error,
+        contentColor = MaterialTheme.colorScheme.onError
+    ),
+    contentPadding = ButtonDefaults.ButtonWithIconContentPadding
+) {
+    // ic_delete: icon Material Symbols tải về res/drawable (tên giả định)
+    Icon(
+        painter = painterResource(R.drawable.ic_delete),
+        contentDescription = null,
+        modifier = Modifier.size(ButtonDefaults.IconSize)
+    )
+    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+    Text("Xóa ghi chú")
+}</code></pre>
+
+    <h4>Nút chỉ có icon</h4>
+    <ul>
+      <li><code>IconButton</code>: icon không nền, dùng trên thanh công cụ, trong ô nhập (nút xóa, nút hiện mật khẩu).</li>
+      <li><code>FilledIconButton</code>, <code>FilledTonalIconButton</code>, <code>OutlinedIconButton</code>: có nền/viền, nổi bật hơn.</li>
+      <li><code>IconToggleButton(checked, onCheckedChange)</code>: nút bật/tắt như "Yêu thích", "Ghim". Bạn tự đổi icon theo <code>checked</code>.</li>
+    </ul>
+    <p>Với <code>IconButton</code>, <code>contentDescription</code> của icon <strong>bắt buộc phải có nội dung</strong> vì đó là mô tả duy nhất cho trình đọc màn hình.</p>
+
+    <h4>Floating Action Button</h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Composable</th><th>Đặc điểm</th></tr></thead>
+      <tbody>
+        <tr><td><code>FloatingActionButton</code></td><td>Cỡ chuẩn, chứa một icon</td></tr>
+        <tr><td><code>SmallFloatingActionButton</code></td><td>Nhỏ hơn, cho màn hình chật hoặc hành động phụ đi kèm</td></tr>
+        <tr><td><code>LargeFloatingActionButton</code></td><td>To, dễ thấy, hợp màn hình lớn</td></tr>
+        <tr><td><code>ExtendedFloatingActionButton</code></td><td>Có cả icon và chữ (<code>icon = {…}</code>, <code>text = {…}</code>); tham số <code>expanded</code> điều khiển thu gọn chỉ còn icon</td></tr>
+      </tbody>
+    </table></div>
+    <p>FAB thường được đặt qua tham số <code>floatingActionButton</code> của <a href="#scaffold">Scaffold</a> để tự nằm đúng góc dưới, không bị Snackbar che.</p>
+
+    <h4>Segmented button: chọn một trong vài lựa chọn</h4>
+    <p>Khi cần chọn nhanh giữa 2–5 lựa chọn (ví dụ đơn vị nhiệt độ, chế độ xem), dùng <code>SingleChoiceSegmentedButtonRow</code> chứa các <code>SegmentedButton</code>. Hàm <code>SegmentedButtonDefaults.itemShape(index, count)</code> tự bo góc đúng cho nút đầu, giữa và cuối.</p>
+    <pre><code class="language-kotlin">@Composable
+fun TemperatureUnitPicker() {
+    val options = listOf("°C", "°F")
+    var selectedIndex by remember { mutableIntStateOf(0) }
+
+    SingleChoiceSegmentedButtonRow {
+        options.forEachIndexed { index, label -&gt;
+            SegmentedButton(
+                selected = index == selectedIndex,
+                onClick = { selectedIndex = index },
+                shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size)
+            ) {
+                Text(label)
+            }
+        }
+    }
+}</code></pre>
+    <div class="callout info"><strong>Lưu ý:</strong> Nếu trình biên dịch báo đây là API thử nghiệm (thường gặp ở bản Material 3 cũ), thêm <code>@OptIn(ExperimentalMaterial3Api::class)</code> lên hàm.</div>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>Ví dụ 1: Thứ bậc nút trên màn hình xác nhận đơn hàng</h4>
+    <pre><code class="language-kotlin">@Composable
+fun OrderConfirmActions(
+    onConfirm: () -&gt; Unit,
+    onEdit: () -&gt; Unit,
+    onCancel: () -&gt; Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Button(onClick = onConfirm, modifier = Modifier.fillMaxWidth()) {
+            Text("Xác nhận đặt hàng")
+        }
+        OutlinedButton(onClick = onEdit, modifier = Modifier.fillMaxWidth()) {
+            Text("Sửa địa chỉ giao hàng")
+        }
+        TextButton(onClick = onCancel, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+            Text("Hủy đơn")
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun OrderConfirmActionsPreview() {
+    MaterialTheme { OrderConfirmActions(onConfirm = {}, onEdit = {}, onCancel = {}) }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Ba nút xếp dọc: nút "Xác nhận đặt hàng" nền màu chủ đạo, rộng hết màn hình; nút "Sửa địa chỉ giao hàng" chỉ có viền; dưới cùng là chữ "Hủy đơn" không nền, căn giữa. Người dùng nhìn là biết nên bấm nút nào trước.</p>
+
+    <h4>Ví dụ 2: Thanh hành động giỏ hàng</h4>
+    <pre><code class="language-kotlin">@Composable
+fun CartActionBar(
+    totalPrice: String,
+    itemCount: Int,
+    isSaved: Boolean,
+    onSavedChange: (Boolean) -&gt; Unit,
+    onCheckout: () -&gt; Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(tonalElevation = 3.dp, modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconToggleButton(checked = isSaved, onCheckedChange = onSavedChange) {
+                // ic_bookmark / ic_bookmark_filled: icon Material Symbols (tên giả định)
+                Icon(
+                    painter = painterResource(
+                        if (isSaved) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark
+                    ),
+                    contentDescription = if (isSaved) "Bỏ lưu giỏ hàng" else "Lưu giỏ hàng"
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Tổng cộng", style = MaterialTheme.typography.labelMedium)
+                Text(
+                    text = totalPrice,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Button(
+                onClick = onCheckout,
+                enabled = itemCount &gt; 0,
+                contentPadding = ButtonDefaults.ButtonWithIconContentPadding
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_shopping_bag),
+                    contentDescription = null,
+                    modifier = Modifier.size(ButtonDefaults.IconSize)
+                )
+                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                Text("Thanh toán ($itemCount)")
+            }
+        }
+    }
+}
+
+@Preview
+@Composable
+fun CartActionBarPreview() {
+    var saved by remember { mutableStateOf(false) }
+    MaterialTheme {
+        CartActionBar(
+            totalPrice = "1.250.000 đ",
+            itemCount = 3,
+            isSaved = saved,
+            onSavedChange = { saved = it },
+            onCheckout = {}
+        )
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Một thanh ngang nền hơi đậm hơn nền màn hình: bên trái là icon dấu trang (bấm vào thì đổi sang dạng tô kín), ở giữa là "Tổng cộng 1.250.000 đ", bên phải là nút "Thanh toán (3)" có icon túi mua sắm. Khi giỏ trống (<code>itemCount = 0</code>), nút thanh toán bị mờ và không bấm được.</p>
+
+    <h4>Ví dụ 3: FAB mở rộng tự thu gọn khi cuộn danh sách</h4>
+    <p>Ý tưởng: khi danh sách đang ở đầu thì FAB hiện cả chữ "Ghi chú mới"; khi người dùng cuộn xuống, FAB thu lại chỉ còn icon để đỡ che nội dung. Trạng thái cuộn lấy từ <code>LazyListState</code> (xem <a href="#lazy-list">Lazy list</a>).</p>
+    <pre><code class="language-kotlin">@Composable
+fun NotesScreen(notes: List&lt;String&gt;, onAddNote: () -&gt; Unit) {
+    val listState = rememberLazyListState()
+    // derivedStateOf: chỉ báo thay đổi khi kết quả true/false đổi,
+    // không phải mỗi pixel cuộn
+    val fabExpanded by remember {
+        derivedStateOf { listState.firstVisibleItemIndex == 0 }
+    }
+
+    Scaffold(
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = onAddNote,
+                expanded = fabExpanded,
+                icon = {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_add),
+                        // Khi thu gọn không còn chữ, nên icon phải tự mô tả
+                        contentDescription = if (fabExpanded) null else "Ghi chú mới"
+                    )
+                },
+                text = { Text("Ghi chú mới") }
+            )
+        }
+    ) { innerPadding -&gt;
+        LazyColumn(
+            state = listState,
+            contentPadding = innerPadding,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            items(notes) { note -&gt;
+                Text(
+                    text = note,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                )
+            }
+        }
+    }
+}
+
+@Preview
+@Composable
+fun NotesScreenPreview() {
+    MaterialTheme {
+        NotesScreen(notes = List(40) { "Ghi chú số ${it + 1}" }, onAddNote = {})
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Góc dưới phải có FAB dạng viên thuốc với icon "+" và chữ "Ghi chú mới". Cuộn danh sách xuống, FAB co lại thành nút vuông bo góc chỉ có dấu "+" (có hiệu ứng chuyển động). Cuộn ngược lên đầu, chữ hiện trở lại.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li><strong>Vùng chạm tối thiểu 48dp.</strong> Các nút Material 3 tự đảm bảo vùng chạm 48×48dp kể cả khi phần nhìn thấy nhỏ hơn (ví dụ <code>Button</code> chỉ cao 40dp). Nếu bạn tự làm nút bằng <code>Modifier.clickable</code>, hãy thêm <code>Modifier.minimumInteractiveComponentSize()</code> hoặc đặt kích thước đủ lớn.</li>
+      <li><strong>Chống bấm hai lần.</strong> Người dùng hay bấm liên tục vào "Thanh toán" khi mạng chậm. Cách đơn giản nhất: có biến <code>isSubmitting</code> trong state và đặt <code>enabled = !isSubmitting</code>. Nếu không có trạng thái để dựa vào, có thể chặn theo thời gian:
+        <pre><code class="language-kotlin">var lastClickTime by remember { mutableLongStateOf(0L) }
+Button(onClick = {
+    val now = SystemClock.elapsedRealtime()
+    if (now - lastClickTime &gt; 800) {
+        lastClickTime = now
+        onCheckout()
+    }
+}) { Text("Thanh toán") }</code></pre>
+      </li>
+      <li>Mỗi màn hình chỉ nên có <strong>một</strong> FAB và một nút <code>Button</code> chính. Quá nhiều nút nổi bật khiến người dùng không biết bấm gì.</li>
+      <li>Icon nằm cạnh chữ trong nút thì đặt <code>contentDescription = null</code> (chữ đã mô tả rồi); icon đứng một mình trong <code>IconButton</code>/FAB thì phải có mô tả (xem <a href="#accessibility">Accessibility</a>).</li>
+      <li>Đọc thẳng <code>listState.firstVisibleItemIndex</code> trong thân hàm composable sẽ làm màn hình vẽ lại liên tục khi cuộn; bọc trong <code>derivedStateOf</code> như ví dụ 3 (xem <a href="#performance">Hiệu năng</a>).</li>
+      <li>Hạn chế tự đặt màu cứng cho nút; dùng màu từ <code>MaterialTheme.colorScheme</code> để nút tự đổi đúng ở chế độ tối và với Dynamic Color.</li>
+    </ul>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/components/button?hl=vi" target="_blank" rel="noopener">Button</a></p>
+</section>

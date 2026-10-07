@@ -1,0 +1,159 @@
+<section class="topic" id="lo-trinh" data-title="Lộ trình học &amp; tài nguyên">
+  <h2>Lộ trình học và tài nguyên tiếp theo</h2>
+  <p class="lead">Học Compose hiệu quả nhất là đi theo năm giai đoạn, mỗi giai đoạn kết thúc bằng một sản phẩm nhỏ tự làm. Mục này gợi ý thứ tự đọc, bài tập thực hành và nơi học tiếp sau cẩm nang.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p>Lộ trình học là thứ tự đọc các chủ đề sao cho kiến thức sau dựa trên kiến thức trước: phải hiểu hàm <code>@Composable</code> mới hiểu được state, phải hiểu state mới dùng được ViewModel và điều hướng. Đọc lộn xộn dễ dẫn tới việc chép code chạy được nhưng không biết vì sao.</p>
+    <p>Mỗi giai đoạn bên dưới có một <strong>đầu ra</strong> cụ thể: một ứng dụng nhỏ bạn tự viết lại từ đầu, không nhìn ví dụ. Làm được đầu ra đó nghĩa là bạn đã sẵn sàng sang giai đoạn tiếp theo.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Giai đoạn</th><th>Thời gian gợi ý</th><th>Chủ đề cần đọc</th><th>Đầu ra tự làm</th></tr></thead>
+      <tbody>
+        <tr><td><strong>1. Nền tảng</strong></td><td>Tuần 1</td><td><a href="#compose-la-gi">Compose là gì</a>, <a href="#kotlin-can-biet">Kotlin cần biết</a>, <a href="#thiet-lap-du-an">Thiết lập dự án</a>, <a href="#ham-composable">Hàm @Composable</a>, <a href="#preview">@Preview</a>, <a href="#tu-duy-compose">Tư duy Compose</a></td><td>Tạo project, viết thẻ "danh thiếp" gồm ảnh, tên và nghề nghiệp, có preview sáng/tối</td></tr>
+        <tr><td><strong>2. Bố cục và thành phần</strong></td><td>Tuần 2–3</td><td><a href="#column-row-box">Column, Row, Box</a>, <a href="#modifier">Modifier</a>, <a href="#kich-thuoc-rang-buoc">Kích thước</a>, <a href="#lazy-list">LazyColumn</a>, <a href="#scaffold">Scaffold</a>, <a href="#text">Text</a>, <a href="#textfield">TextField</a>, <a href="#button">Button</a>, <a href="#image-icon">Image</a>, <a href="#card-chip">Card</a></td><td>Dựng lại tĩnh một màn hình cửa hàng: thanh trên cùng, ô tìm kiếm, lưới sản phẩm</td></tr>
+        <tr><td><strong>3. Trạng thái</strong></td><td>Tuần 4</td><td><a href="#state-remember">State &amp; remember</a>, <a href="#state-hoisting">State hoisting</a>, <a href="#luu-trang-thai">Lưu trạng thái</a>, <a href="#viewmodel">ViewModel</a>, <a href="#side-effects">Side effects</a>, <a href="#vong-doi-giai-doan">Vòng đời</a></td><td>App ghi chú thêm/xóa được, không mất dữ liệu khi xoay màn hình (xem ví dụ bên dưới)</td></tr>
+        <tr><td><strong>4. Điều hướng và theme</strong></td><td>Tuần 5</td><td><a href="#navigation">Navigation</a>, <a href="#navigation-bar">Thanh điều hướng</a>, <a href="#material3">Material 3</a>, <a href="#custom-theme">Tùy biến theme</a>, <a href="#dialog-sheet-menu">Dialog</a>, <a href="#progress-snackbar">Snackbar</a></td><td>Mở rộng app ghi chú: màn chi tiết, 3 tab, màu thương hiệu, dark mode, hoàn tác khi xóa</td></tr>
+        <tr><td><strong>5. Hoàn thiện</strong></td><td>Tuần 6 trở đi</td><td><a href="#animation-co-ban">Animation</a>, <a href="#gestures">Cử chỉ</a>, <a href="#accessibility">Hỗ trợ tiếp cận</a>, <a href="#testing">Kiểm thử</a>, <a href="#performance">Hiệu suất</a>, <a href="#adaptive">Bố cục thích ứng</a></td><td>Thêm animation, vuốt để xóa, viết 3 bài test UI, chạy tốt trên tablet và khi bật TalkBack</td></tr>
+      </tbody>
+    </table></div>
+    <p>Cách học mỗi chủ đề:</p>
+    <ol>
+      <li>Đọc phần Định nghĩa và Cách dùng, chưa cần nhớ hết tham số.</li>
+      <li>Gõ lại ví dụ vào Android Studio thay vì chép, rồi sửa thử một chi tiết để xem kết quả thay đổi thế nào.</li>
+      <li>Đọc phần Chú ý và cố tình gây ra một lỗi trong đó để nhận ra nó lần sau.</li>
+      <li>Bấm <strong>Đánh dấu đã đọc</strong> để theo dõi tiến độ trong thanh bên.</li>
+    </ol>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>Đầu ra giai đoạn 3: app ghi chú tối giản</h4>
+    <p>Ví dụ này gom kiến thức của ba chương đầu: ViewModel giữ danh sách, màn hình stateful lấy dữ liệu, phần nội dung stateless có preview, TextField dạng state và LazyColumn có key. Cần dependency <code>lifecycle-viewmodel-compose</code> và <code>lifecycle-runtime-compose</code> như ở mục <a href="#viewmodel">ViewModel</a>.</p>
+    <p class="code-caption">NotesViewModel.kt: dữ liệu và logic</p>
+    <pre><code class="language-kotlin">data class Note(val id: Long, val text: String)
+
+data class NotesUiState(val notes: List&lt;Note&gt; = emptyList())
+
+class NotesViewModel : ViewModel() {
+    private val _uiState = MutableStateFlow(NotesUiState())
+    val uiState: StateFlow&lt;NotesUiState&gt; = _uiState.asStateFlow()
+
+    fun addNote(text: String) {
+        if (text.isBlank()) return
+        val note = Note(id = System.currentTimeMillis(), text = text.trim())
+        _uiState.update { state -> state.copy(notes = listOf(note) + state.notes) }
+    }
+
+    fun deleteNote(id: Long) {
+        _uiState.update { state -> state.copy(notes = state.notes.filterNot { it.id == id }) }
+    }
+}</code></pre>
+    <p class="code-caption">NotesScreen.kt: giao diện</p>
+    <pre><code class="language-kotlin">@Composable
+fun NotesScreen(viewModel: NotesViewModel = viewModel()) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    NotesContent(
+        notes = uiState.notes,
+        onAdd = viewModel::addNote,
+        onDelete = viewModel::deleteNote
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NotesContent(
+    notes: List&lt;Note&gt;,
+    onAdd: (String) -> Unit,
+    onDelete: (Long) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val input = rememberTextFieldState()
+
+    Scaffold(
+        modifier = modifier,
+        topBar = { TopAppBar(title = { Text("Ghi chú") }) }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .padding(innerPadding)
+                .padding(horizontal = 16.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    state = input,
+                    label = { Text("Nội dung ghi chú") },
+                    lineLimits = TextFieldLineLimits.SingleLine,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.width(8.dp))
+                Button(onClick = {
+                    onAdd(input.text.toString())
+                    input.clearText()
+                }) {
+                    Text("Thêm")
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            if (notes.isEmpty()) {
+                Text(
+                    text = "Chưa có ghi chú nào.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            LazyColumn {
+                items(notes, key = { it.id }) { note ->
+                    ListItem(
+                        headlineContent = { Text(note.text) },
+                        trailingContent = {
+                            TextButton(onClick = { onDelete(note.id) }) { Text("Xóa") }
+                        }
+                    )
+                    HorizontalDivider()
+                }
+            }
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun NotesContentPreview() {
+    MaterialTheme {
+        NotesContent(
+            notes = listOf(Note(1, "Mua sữa"), Note(2, "Ôn lại LazyColumn")),
+            onAdd = {},
+            onDelete = {}
+        )
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> gõ nội dung rồi bấm "Thêm" thì ghi chú mới xuất hiện ở đầu danh sách và ô nhập được xóa trống; bấm "Xóa" ở một dòng thì dòng đó biến mất. Xoay màn hình, danh sách vẫn còn vì nằm trong ViewModel, và chữ đang gõ dở vẫn còn vì <code>TextFieldState</code> tự lưu.</p>
+    <div class="callout info"><strong>Lưu ý:</strong> dữ liệu mới chỉ nằm trong bộ nhớ, đóng hẳn app là mất. Bước tiếp theo là lưu vào Room hoặc DataStore; phần đó thuộc kiến trúc ứng dụng chứ không riêng Compose.</div>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li>Đừng cố học hết mọi component trước khi viết app. Học đủ giai đoạn 1–3 là đã làm được ứng dụng thật; các component khác tra cứu khi cần.</li>
+      <li>Ưu tiên hiểu state và recomposition. Đây là phần khác biệt nhất so với View và là gốc của hầu hết lỗi trong mục <a href="#loi-thuong-gap">Lỗi thường gặp</a>.</li>
+      <li>Thư viện Compose ra bản mới vài tuần một lần. Khi gặp ví dụ trên mạng dùng API khác cẩm nang, kiểm tra ngày viết và dùng BOM mới nhất; tránh các API đã deprecated như <code>Divider</code> hay thư viện <code>material-icons-extended</code>.</li>
+      <li>Đọc mã nguồn ứng dụng mẫu chính thức sau khi xong giai đoạn 4: bạn sẽ thấy các khái niệm trong cẩm nang ghép lại thành kiến trúc hoàn chỉnh như thế nào.</li>
+    </ul>
+    <h4>Tài nguyên học tiếp</h4>
+    <ul>
+      <li><a href="https://developer.android.com/develop/ui/compose/documentation" target="_blank" rel="noopener">Tài liệu Jetpack Compose chính thức</a>: tra cứu đầy đủ mọi chủ đề, có bản tiếng Việt cho nhiều trang.</li>
+      <li><a href="https://developer.android.com/courses/android-basics-compose/course" target="_blank" rel="noopener">Android Basics with Compose</a>: khóa học miễn phí từ con số 0, có bài tập theo từng bước.</li>
+      <li><a href="https://developer.android.com/codelabs/jetpack-compose-basics" target="_blank" rel="noopener">Codelab Jetpack Compose basics</a>: bài thực hành ngắn để làm quen trong một buổi.</li>
+      <li><a href="https://github.com/android/compose-samples" target="_blank" rel="noopener">Compose Samples</a>: bộ ứng dụng mẫu chính thức với nhiều kiểu giao diện.</li>
+      <li><a href="https://github.com/android/nowinandroid" target="_blank" rel="noopener">Now in Android</a>: ứng dụng mẫu đầy đủ kiến trúc, điều hướng, kiểm thử.</li>
+      <li><a href="https://m3.material.io/" target="_blank" rel="noopener">Material Design 3</a>: hướng dẫn thiết kế cho từng component.</li>
+      <li><a href="https://kotlinlang.org/docs/home.html" target="_blank" rel="noopener">Tài liệu Kotlin</a>: ôn lại ngôn ngữ khi gặp cú pháp lạ.</li>
+    </ul>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/documentation" target="_blank" rel="noopener">Jetpack Compose documentation</a></p>
+</section>

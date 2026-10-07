@@ -1,0 +1,163 @@
+<section class="topic" id="vong-doi-giai-doan" data-title="Vòng đời &amp; giai đoạn">
+  <h2>Vòng đời composable và ba giai đoạn của Compose</h2>
+  <p class="lead">Hiểu một composable "sống" trong composition ra sao và mỗi khung hình được dựng qua những giai đoạn nào giúp bạn đặt state đúng chỗ, tránh recompose thừa và viết UI mượt hơn.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p><strong>Composition</strong> là cây mô tả giao diện mà Compose tạo ra khi chạy các hàm composable. Mỗi lần một composable được gọi, nó để lại một "nút" trong cây này. Vòng đời của nút rất đơn giản: <strong>vào composition</strong> (lần đầu được gọi) → <strong>recompose 0 đến n lần</strong> (khi state nó đọc thay đổi) → <strong>rời composition</strong> (không còn được gọi nữa, ví dụ nhánh <code>if</code> chuyển sang <code>false</code>). Giá trị <code>remember</code> sống đúng bằng quãng thời gian này; effect như <code>LaunchedEffect</code> bắt đầu khi vào và bị hủy khi rời (xem <a href="#side-effects">Side effects</a>).</p>
+    <p>Ngoài vòng đời, mỗi khung hình Compose xử lý qua <strong>ba giai đoạn</strong>: <em>Composition</em> (hiển thị cái gì), <em>Layout</em> (đặt ở đâu) và <em>Drawing</em> (vẽ thế nào). Hệ View cũ chỉ có measure → layout → draw vì cây View được inflate một lần; Compose thêm giai đoạn Composition phía trước để có thể dựng lại cây từ state (xem <a href="#tu-duy-compose">Tư duy Compose</a>).</p>
+    <p>Điểm quan trọng: Compose theo dõi <em>state được đọc ở giai đoạn nào</em>. Nếu state chỉ được đọc trong giai đoạn Drawing, khi nó đổi Compose chỉ cần vẽ lại, bỏ qua hoàn toàn Composition và Layout.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>Định danh theo vị trí gọi</h4>
+    <p>Compose phân biệt các lần gọi composable bằng <strong>vị trí gọi</strong> (call site) trong mã nguồn và <strong>thứ tự</strong> gọi. Hai lần gọi <code>Text()</code> ở hai dòng khác nhau là hai nút khác nhau; một composable được gọi lại ở cùng vị trí là "cùng một" nút và giữ nguyên state <code>remember</code> của nó.</p>
+    <pre><code class="language-kotlin">@Composable
+fun ProfileHeader(isVip: Boolean, name: String) {
+    Column {
+        if (isVip) {
+            VipBadge()      // vào/rời composition theo isVip
+        }
+        UserName(name)      // luôn là cùng một nút, state không bị mất
+    }
+}</code></pre>
+    <p>Trong vòng lặp, các lần gọi nằm ở cùng một vị trí nên Compose chỉ dựa vào thứ tự. Khi chèn hoặc xóa phần tử ở giữa, state có thể "nhảy" sang phần tử khác. Bọc nội dung bằng <code>key(id) { … }</code> để gắn định danh cố định. Với <code>LazyColumn</code>, truyền <code>key = { it.id }</code> cho <code>items</code> (xem <a href="#lazy-list">Lazy list</a>).</p>
+
+    <h4>Bỏ qua (skipping)</h4>
+    <p>Khi cha recompose, một composable con được <strong>bỏ qua</strong> nếu mọi tham số không đổi so với lần trước. Với các tham số ổn định (kiểu nguyên thủy, <code>String</code>, lớp đánh dấu <code>@Immutable</code>/<code>@Stable</code>, <code>data class</code> chỉ gồm <code>val</code> ổn định), Compose so sánh bằng <code>equals</code>. Từ Kotlin 2.0.20, chế độ <em>strong skipping</em> được bật mặc định: tham số không ổn định (như <code>List</code>) vẫn được bỏ qua nếu là cùng một đối tượng (<code>===</code>). Chi tiết ở <a href="#performance">Hiệu năng</a>.</p>
+
+    <h4>Ba giai đoạn</h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Giai đoạn</th><th>Trả lời câu hỏi</th><th>Việc thực hiện</th><th>Đọc state ở đây khi</th></tr></thead>
+      <tbody>
+        <tr><td>Composition</td><td>Hiển thị cái gì?</td><td>Chạy hàm composable, tạo hoặc cập nhật cây UI</td><td>Đọc trong thân hàm composable</td></tr>
+        <tr><td>Layout</td><td>Đặt ở đâu?</td><td>Đo (measure) kích thước rồi đặt (place) vị trí từng phần tử</td><td>Đọc trong lambda của <code>Modifier.offset { }</code>, <code>Modifier.layout { }</code>, <code>Layout</code></td></tr>
+        <tr><td>Drawing</td><td>Vẽ thế nào?</td><td>Vẽ pixel lên canvas</td><td>Đọc trong <code>drawBehind { }</code>, <code>drawWithContent { }</code>, <code>Canvas { }</code>, <code>graphicsLayer { }</code></td></tr>
+      </tbody>
+    </table></div>
+    <p>Quy tắc: state đọc ở giai đoạn nào thì khi đổi, <strong>giai đoạn đó trở đi</strong> chạy lại. Đọc ở Composition → chạy cả ba; đọc ở Layout → chỉ Layout và Drawing; đọc ở Drawing → chỉ Drawing.</p>
+
+    <h4>Trì hoãn việc đọc state</h4>
+    <p>Với giá trị đổi liên tục (animation, vị trí cuộn), hãy dùng phiên bản modifier nhận lambda để đẩy việc đọc xuống giai đoạn sau:</p>
+    <pre><code class="language-kotlin">// Chưa tối ưu: đọc x trong Composition, mỗi khung hình recompose
+Box(Modifier.offset(x = x.dp))
+
+// Tối ưu: đọc x trong Layout, bỏ qua Composition
+Box(Modifier.offset { IntOffset(x.dp.roundToPx(), 0) })
+
+// Chưa tối ưu: màu animation đọc trong Composition
+Box(Modifier.background(animatedColor))
+
+// Tối ưu: chỉ vẽ lại
+Box(Modifier.drawBehind { drawRect(animatedColor) })</code></pre>
+    <p>Khi cần truyền giá trị đổi liên tục xuống composable con, truyền một lambda <code>() -&gt; Float</code> thay vì giá trị <code>Float</code>, để con tự đọc trong giai đoạn muộn nhất có thể.</p>
+
+    <h4>Bẫy "ghi ngược" (backwards write)</h4>
+    <p>Đừng ghi vào một state <em>sau khi</em> đã đọc nó trong cùng một lần composition. Mỗi lần ghi lại kích hoạt recompose mới, tạo vòng lặp vô tận:</p>
+    <pre><code class="language-kotlin">@Composable
+fun BadCounter() {
+    var count by remember { mutableIntStateOf(0) }
+    Text("Đã hiển thị $count lần")
+    count++ // SAI: ghi ngược ngay trong composition
+}</code></pre>
+    <p>Chỉ thay đổi state trong callback (<code>onClick</code>…) hoặc trong effect.</p>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>1. Giữ đúng state cho từng ghi chú bằng key</h4>
+    <pre><code class="language-kotlin">data class Note(val id: Long, val title: String, val body: String)
+
+@Composable
+fun NoteRow(note: Note) {
+    var expanded by remember { mutableStateOf(false) }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clickable { expanded = !expanded }
+            .padding(16.dp)
+    ) {
+        Text(note.title, style = MaterialTheme.typography.titleMedium)
+        if (expanded) Text(note.body)
+    }
+}
+
+@Composable
+fun NoteColumn(notes: List&lt;Note&gt;) {
+    Column {
+        for (note in notes) {
+            key(note.id) {
+                NoteRow(note)
+            }
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Mở rộng ghi chú "Đi chợ", sau đó thêm một ghi chú mới lên đầu danh sách: "Đi chợ" vẫn ở trạng thái mở rộng. Nếu bỏ <code>key</code>, trạng thái mở rộng sẽ dính vào ghi chú ở vị trí đầu tiên, tức ghi chú vừa thêm.</p>
+
+    <h4>2. Header danh bạ thu nhỏ khi cuộn, không recompose</h4>
+    <pre><code class="language-kotlin">@Composable
+fun ContactsScreen(contacts: List&lt;String&gt;) {
+    val listState = rememberLazyListState()
+    val headerHeight = 180.dp
+    val headerHeightPx = with(LocalDensity.current) { headerHeight.toPx() }
+
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(
+            state = listState,
+            contentPadding = PaddingValues(top = headerHeight)
+        ) {
+            items(contacts) { name -&gt; ListItem(headlineContent = { Text(name) }) }
+        }
+        CollapsingHeader(
+            height = headerHeight,
+            // Truyền lambda: vị trí cuộn chỉ được đọc khi header vẽ
+            collapseFraction = {
+                if (listState.firstVisibleItemIndex &gt; 0) 1f
+                else (listState.firstVisibleItemScrollOffset / headerHeightPx).coerceIn(0f, 1f)
+            }
+        )
+    }
+}
+
+@Composable
+fun CollapsingHeader(height: Dp, collapseFraction: () -&gt; Float) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(height)
+            .graphicsLayer { translationY = -height.toPx() * 0.6f * collapseFraction() }
+            .background(MaterialTheme.colorScheme.primaryContainer),
+        contentAlignment = Alignment.BottomStart
+    ) {
+        Text(
+            text = "Danh bạ",
+            style = MaterialTheme.typography.headlineLarge,
+            modifier = Modifier
+                .padding(16.dp)
+                .graphicsLayer {
+                    val scale = 1f - 0.4f * collapseFraction()
+                    scaleX = scale
+                    scaleY = scale
+                    transformOrigin = TransformOrigin(0f, 1f)
+                }
+        )
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Khi cuộn danh bạ, header trượt lên và chữ "Danh bạ" nhỏ dần về góc trái. Vì vị trí cuộn chỉ được đọc trong <code>graphicsLayer { }</code>, mỗi khung hình chỉ chạy giai đoạn Drawing; Layout Inspector cho thấy số lần recompose của <code>CollapsingHeader</code> không tăng.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li>Đừng giả định số lần hay thứ tự chạy của composable. Hàm có thể chạy nhiều lần, bị bỏ qua hoặc bị hủy giữa chừng; vì vậy thân hàm phải không có side effect.</li>
+      <li>Key trong <code>key()</code> hoặc <code>items(key = …)</code> phải ổn định và duy nhất, thường là id từ dữ liệu. Không dùng chỉ số (index) hay giá trị ngẫu nhiên.</li>
+      <li>Đọc state trong một lambda <em>chạy ngay</em> trong composition (như <code>remember { }</code>, <code>let { }</code>) vẫn tính là đọc ở Composition. Chỉ lambda được gọi ở Layout/Drawing mới trì hoãn được.</li>
+      <li>Phiên bản lambda của modifier chỉ đáng dùng cho giá trị đổi thường xuyên. Với giá trị tĩnh, <code>Modifier.offset(8.dp)</code> vẫn rõ ràng và tốt.</li>
+      <li>Dùng Layout Inspector của Android Studio (cột đếm recomposition) để kiểm tra trước và sau khi tối ưu, thay vì đoán.</li>
+    </ul>
+    <div class="callout warn"><strong>Cảnh báo:</strong> Ghi vào state đã đọc trong cùng lần composition (backwards write) gây recompose vô hạn, làm treo hoặc giật giao diện. Chỉ ghi state trong callback hoặc effect.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/lifecycle" target="_blank" rel="noopener">Lifecycle of composables</a> và <a href="https://developer.android.com/develop/ui/compose/phases" target="_blank" rel="noopener">Compose phases</a></p>
+</section>

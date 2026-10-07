@@ -1,0 +1,196 @@
+<section class="topic" id="edge-to-edge" data-title="Tràn viền &amp; Insets">
+  <h2>Tràn viền (edge-to-edge) và WindowInsets</h2>
+  <p class="lead">Ứng dụng Android hiện đại vẽ giao diện phủ kín cả màn hình, kể cả phía sau thanh trạng thái và thanh điều hướng. Từ Android 15 điều này là bắt buộc, nên bạn cần biết cách dùng <code>WindowInsets</code> để nội dung quan trọng không bị che.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p><strong>Tràn viền</strong> (edge-to-edge) nghĩa là cửa sổ ứng dụng chiếm toàn bộ màn hình: nền, ảnh, danh sách được vẽ cả phía sau <em>thanh trạng thái</em> (status bar, chứa giờ, pin) ở trên và <em>thanh điều hướng</em> (navigation bar, thanh cử chỉ hoặc 3 nút) ở dưới. Kiểu cũ thì hệ thống tự chừa hai dải màu riêng cho các thanh này, khiến app trông "bị đóng khung".</p>
+    <p><strong>WindowInsets</strong> là thông tin hệ thống gửi cho app: ở mỗi cạnh màn hình có bao nhiêu điểm ảnh đang bị thanh hệ thống, bàn phím ảo hay phần khuyết camera chiếm chỗ. Khi đã tràn viền, bạn dùng insets để đẩy chữ, nút bấm vào vùng an toàn, còn nền và ảnh vẫn được phép tràn ra sau.</p>
+    <p>Với app có <code>targetSdk</code> 35 trở lên chạy trên Android 15+, hệ thống <strong>bắt buộc</strong> tràn viền: các hàm cũ như <code>window.statusBarColor</code> không còn tác dụng. Thuộc tính tạm thời để từ chối tràn viền cũng bị vô hiệu khi app target Android 16. Vì vậy mọi app mới nên xử lý insets ngay từ đầu.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>Bước 1: Bật tràn viền trong Activity</h4>
+    <p>Gọi <code>enableEdgeToEdge()</code> (thư viện <code>androidx.activity:activity-compose:1.13.0</code>) trong <code>onCreate</code>, <strong>trước</strong> <code>setContent</code>. Hàm này làm các thanh hệ thống trong suốt và tự chọn màu biểu tượng phù hợp, giúp app trông giống nhau trên cả Android cũ lẫn mới.</p>
+    <pre><code class="language-kotlin">class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContent {
+            NotesTheme { NotesApp() }
+        }
+    }
+}</code></pre>
+    <p>Để bàn phím ảo báo kích thước qua insets (thay vì hệ thống tự "đẩy" cả cửa sổ lên), khai báo <code>adjustResize</code> cho Activity trong <code>AndroidManifest.xml</code>:</p>
+    <pre><code class="language-markup">&lt;activity
+    android:name=".MainActivity"
+    android:exported="true"
+    android:windowSoftInputMode="adjustResize"&gt;</code></pre>
+
+    <h4>Bước 2: Chọn loại insets cần tránh</h4>
+    <div class="table-wrap"><table>
+      <thead>
+        <tr><th>Loại</th><th>Mô tả</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>WindowInsets.statusBars</code></td><td>Thanh trạng thái phía trên.</td></tr>
+        <tr><td><code>WindowInsets.navigationBars</code></td><td>Thanh điều hướng (cử chỉ hoặc 3 nút), thường ở dưới, có thể ở cạnh khi xoay ngang.</td></tr>
+        <tr><td><code>WindowInsets.systemBars</code></td><td>Gộp thanh trạng thái, thanh điều hướng và thanh tiêu đề cửa sổ (khi app chạy dạng cửa sổ).</td></tr>
+        <tr><td><code>WindowInsets.ime</code></td><td>Bàn phím ảo; bằng 0 khi bàn phím đóng và thay đổi liên tục trong lúc bàn phím trượt lên/xuống.</td></tr>
+        <tr><td><code>WindowInsets.displayCutout</code></td><td>Phần khuyết màn hình (tai thỏ, lỗ camera).</td></tr>
+        <tr><td><code>WindowInsets.safeDrawing</code></td><td>Gộp thanh hệ thống, phần khuyết và bàn phím: vùng mà vẽ nội dung vào thì chắc chắn không bị che. Lựa chọn mặc định an toàn nhất.</td></tr>
+        <tr><td><code>WindowInsets.safeContent</code></td><td><code>safeDrawing</code> cộng thêm vùng cử chỉ hệ thống (vuốt mép để quay lại): an toàn cả để vẽ lẫn để đặt phần tử cần chạm, kéo.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h4>Bước 3: Áp dụng insets</h4>
+    <ul>
+      <li><strong>Cách dễ nhất:</strong> dùng <a href="#scaffold">Scaffold</a> và component Material 3. <code>TopAppBar</code> tự chừa thanh trạng thái, <code>NavigationBar</code>/<code>BottomAppBar</code> tự chừa thanh điều hướng; bạn chỉ cần áp <code>innerPadding</code> cho nội dung.</li>
+      <li><strong>Modifier đệm theo insets:</strong> <code>Modifier.windowInsetsPadding(WindowInsets.xxx)</code> cho loại bất kỳ, hoặc các lối tắt <code>safeDrawingPadding()</code>, <code>systemBarsPadding()</code>, <code>statusBarsPadding()</code>, <code>navigationBarsPadding()</code>, <code>imePadding()</code>, <code>displayCutoutPadding()</code>.</li>
+      <li><strong>Danh sách cuộn:</strong> đừng đệm bên ngoài <code>LazyColumn</code>; hãy truyền insets vào <code>contentPadding</code>, ví dụ <code>contentPadding = WindowInsets.systemBars.asPaddingValues()</code>. Nhờ vậy nội dung cuộn ra sau thanh hệ thống nhưng phần tử đầu/cuối vẫn hiện đủ.</li>
+      <li><strong>Tránh đệm hai lần:</strong> các modifier đệm insets tự đánh dấu phần đã dùng (<em>consume</em>) để phần tử con không cộng lại lần nữa. Riêng <code>innerPadding</code> của Scaffold chỉ là <code>PaddingValues</code>, nên khi con bên trong còn dùng <code>imePadding()</code>, hãy gọi thêm <code>Modifier.consumeWindowInsets(innerPadding)</code>.</li>
+      <li><strong>Khoảng trống bằng đúng chiều cao thanh:</strong> <code>Spacer(Modifier.windowInsetsTopHeight(WindowInsets.statusBars))</code>.</li>
+    </ul>
+
+    <h4>Màu biểu tượng trên thanh trạng thái</h4>
+    <p>Mặc định, <code>enableEdgeToEdge()</code> dùng chế độ tự động: giao diện sáng thì biểu tượng tối, giao diện tối thì biểu tượng sáng. Nếu màn hình của bạn luôn có nền tối ở trên cùng (ảnh bìa, dải màu đậm), hãy truyền kiểu thanh rõ ràng. Màu ở đây là số nguyên của <code>android.graphics.Color</code>, không phải <code>Color</code> của Compose:</p>
+    <pre><code class="language-kotlin">enableEdgeToEdge(
+    // dark = nền tối, nên biểu tượng giờ/pin hiển thị màu sáng
+    statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+)</code></pre>
+    <p>Ngược lại, <code>SystemBarStyle.light(scrim, darkScrim)</code> cho biểu tượng tối, còn <code>SystemBarStyle.auto(lightScrim, darkScrim)</code> là chế độ tự động.</p>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>Ví dụ 1: Màn thời tiết nền tràn viền, chữ nằm trong vùng an toàn</h4>
+    <pre><code class="language-kotlin">@Composable
+fun WeatherScreen() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Brush.verticalGradient(listOf(Color(0xFF1565C0), Color(0xFF64B5F6))))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .safeDrawingPadding()
+                .padding(24.dp)
+        ) {
+            Text("Hà Nội", style = MaterialTheme.typography.headlineMedium, color = Color.White)
+            Text("28°", style = MaterialTheme.typography.displayLarge, color = Color.White)
+            Spacer(Modifier.weight(1f))
+            Text("Nhiều mây, chiều tối có mưa rào", color = Color.White)
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Dải màu xanh phủ kín màn hình, kể cả phía sau giờ và pin ở trên cùng và thanh cử chỉ ở dưới. Chữ "Hà Nội" nằm ngay dưới thanh trạng thái, dòng mô tả nằm ngay trên thanh điều hướng, không chữ nào bị che. Nên kết hợp với <code>SystemBarStyle.dark(…)</code> để biểu tượng thanh trạng thái màu trắng.</p>
+
+    <h4>Ví dụ 2: Danh bạ cuộn phía sau thanh hệ thống (không dùng Scaffold)</h4>
+    <pre><code class="language-kotlin">@Composable
+fun ContactList(contacts: List&lt;String&gt;) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = WindowInsets.systemBars.asPaddingValues()
+    ) {
+        items(contacts) { contact -&gt;
+            ListItem(headlineContent = { Text(contact) })
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Khi đứng yên ở đầu danh sách, liên hệ đầu tiên nằm ngay dưới thanh trạng thái. Khi cuộn, các dòng trượt mờ ra phía sau thanh trạng thái và thanh điều hướng; cuộn tới cuối, liên hệ cuối cùng vẫn hiện đủ phía trên thanh cử chỉ.</p>
+
+    <h4>Ví dụ 3: Màn chat có ô nhập dính trên bàn phím</h4>
+    <pre><code class="language-kotlin">data class Message(val id: Long, val text: String, val mine: Boolean)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ChatScreen(messages: List&lt;Message&gt;, onSend: (String) -&gt; Unit) {
+    var draft by rememberSaveable { mutableStateOf("") }
+
+    Scaffold(
+        topBar = { TopAppBar(title = { Text("Nhóm học Compose") }) }
+    ) { innerPadding -&gt;
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .consumeWindowInsets(innerPadding)
+                .imePadding()
+        ) {
+            LazyColumn(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                reverseLayout = true,
+                contentPadding = PaddingValues(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(messages.asReversed(), key = { it.id }) { message -&gt;
+                    MessageBubble(message)
+                }
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = draft,
+                    onValueChange = { draft = it },
+                    placeholder = { Text("Nhập tin nhắn") },
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(
+                    onClick = {
+                        onSend(draft)
+                        draft = ""
+                    },
+                    enabled = draft.isNotBlank()
+                ) {
+                    Icon(painterResource(R.drawable.ic_send), contentDescription = "Gửi")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MessageBubble(message: Message) {
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = if (message.mine) Alignment.CenterEnd else Alignment.CenterStart
+    ) {
+        Text(
+            text = message.text,
+            modifier = Modifier
+                .clip(RoundedCornerShape(16.dp))
+                .background(
+                    if (message.mine) MaterialTheme.colorScheme.primaryContainer
+                    else MaterialTheme.colorScheme.surfaceVariant
+                )
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+        )
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Tin nhắn mới nhất nằm sát ô nhập ở dưới cùng. Khi chạm vào ô nhập, bàn phím trượt lên và ô nhập cùng danh sách tin nhắn trượt lên theo, luôn nằm ngay trên bàn phím. Khi bàn phím đóng, ô nhập trở về vị trí ngay trên thanh điều hướng, không có khoảng trống thừa.</p>
+    <div class="callout info"><strong>Lưu ý:</strong> Dòng <code>consumeWindowInsets(innerPadding)</code> là mấu chốt. <code>innerPadding</code> đã chứa chiều cao thanh điều hướng, còn insets bàn phím cũng tính cả phần đó. Nếu không "trừ" đi, ô nhập sẽ bị đẩy cao hơn bàn phím đúng bằng chiều cao thanh điều hướng.</div>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li>Phân biệt rõ: <strong>nền và ảnh</strong> nên tràn ra sau thanh hệ thống; <strong>chữ, nút, ô nhập</strong> phải nằm trong vùng an toàn. Đừng đệm insets ở phần tử gốc nếu bạn muốn nền tràn viền, hãy đệm ở lớp nội dung bên trong (như ví dụ 1).</li>
+      <li>Đệm hai lần là lỗi thường gặp nhất: lồng Scaffold trong Scaffold, hoặc vừa áp <code>innerPadding</code> vừa gọi <code>systemBarsPadding()</code>, sẽ tạo khoảng trống gấp đôi. Mỗi loại insets chỉ nên được áp một lần trên mỗi nhánh giao diện.</li>
+      <li>Với <code>LazyColumn</code>/<code>LazyVerticalGrid</code>, đưa insets vào <code>contentPadding</code>. Dùng <code>Modifier.padding</code> bên ngoài sẽ cắt nội dung, mất hiệu ứng cuộn ra sau thanh hệ thống.</li>
+      <li>Thiếu <code>android:windowSoftInputMode="adjustResize"</code> thì <code>imePadding()</code> có thể không hoạt động như mong đợi.</li>
+      <li>Trong <code>@Preview</code>, insets thường bằng 0 nên bạn không thấy vấn đề. Hãy kiểm tra trên máy thật hoặc emulator với cả điều hướng cử chỉ lẫn 3 nút, khi xoay ngang (phần khuyết camera nằm ở cạnh bên) và khi mở bàn phím.</li>
+      <li><code>Dialog</code> và <code>ModalBottomSheet</code> có cửa sổ riêng và tự xử lý insets; bạn không cần đệm thêm cho chúng (xem <a href="#dialog-sheet-menu">Dialog, sheet, menu</a>).</li>
+    </ul>
+    <div class="callout warn"><strong>Cảnh báo:</strong> Đừng tìm cách tắt tràn viền để "né" việc xử lý insets. Trên Android 15+ với <code>targetSdk</code> 35 trở lên, tràn viền luôn được áp dụng, và giao diện chưa xử lý insets sẽ bị thanh hệ thống đè lên nút bấm.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/system/insets" target="_blank" rel="noopener">About window insets</a></p>
+</section>

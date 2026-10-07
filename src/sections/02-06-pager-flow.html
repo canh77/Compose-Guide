@@ -1,0 +1,215 @@
+<section class="topic" id="pager-flow" data-title="Pager &amp; FlowRow">
+  <h2>Pager và Flow layout</h2>
+  <p class="lead">Pager cho phép người dùng vuốt qua từng "trang" nội dung, như màn giới thiệu app hay băng chuyền khuyến mãi. Flow layout (<code>FlowRow</code>, <code>FlowColumn</code>) xếp phần tử thành hàng và tự xuống dòng khi hết chỗ, rất hợp cho danh sách thẻ (tag).</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p><code>HorizontalPager</code> và <code>VerticalPager</code> là các layout cuộn theo <strong>từng trang</strong>: mỗi lần vuốt, nội dung "bắt dính" (snap) vào đúng một trang thay vì dừng ở vị trí bất kỳ như <code>LazyRow</code>. Bên dưới, Pager cũng là layout lazy nên chỉ dựng những trang đang hiển thị. Nó thay thế cho <code>ViewPager2</code> + Adapter của hệ View cũ. Trạng thái của Pager (đang ở trang nào, đang cuộn hay không) nằm trong đối tượng <code>PagerState</code>.</p>
+    <p><code>FlowRow</code> xếp các phần tử con lần lượt từ trái sang phải; khi hàng hiện tại không còn đủ chỗ, phần tử tiếp theo tự xuống hàng mới, giống chữ trong một đoạn văn. <code>FlowColumn</code> làm điều tương tự theo chiều dọc: hết chiều cao thì sang cột mới. Trước đây bạn phải dùng thư viện ngoài như <code>FlexboxLayout</code> hay <code>ChipGroup</code> để có hành vi này.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>Pager: ba bước cơ bản</h4>
+    <ol>
+      <li>Tạo trạng thái: <code>val pagerState = rememberPagerState(pageCount = { pages.size })</code>. Số trang được truyền dưới dạng <em>lambda</em> để Pager tự cập nhật khi danh sách thay đổi.</li>
+      <li>Gọi <code>HorizontalPager(state = pagerState) { page -&gt; … }</code>. Lambda nhận chỉ số trang và vẽ nội dung trang đó.</li>
+      <li>Muốn chuyển trang bằng code (nút "Tiếp"), dùng hàm <code>suspend</code> <code>animateScrollToPage</code> bên trong một coroutine từ <code>rememberCoroutineScope()</code>.</li>
+    </ol>
+    <div class="table-wrap"><table>
+      <thead>
+        <tr><th>Thuộc tính / hàm của <code>PagerState</code></th><th>Ý nghĩa</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>currentPage</code></td><td>Trang gần vị trí "bắt dính" nhất. Giá trị đổi ngay khi người dùng kéo quá nửa trang, kể cả khi chưa thả tay.</td></tr>
+        <tr><td><code>settledPage</code></td><td>Trang mà Pager đã dừng hẳn. Chỉ đổi khi chuyển động cuộn kết thúc.</td></tr>
+        <tr><td><code>targetPage</code></td><td>Trang mà Pager sẽ dừng lại nếu chuyển động hiện tại kết thúc.</td></tr>
+        <tr><td><code>currentPageOffsetFraction</code></td><td>Trang hiện tại đang lệch bao nhiêu (từ -0.5 đến 0.5), hữu ích để làm hiệu ứng theo ngón tay.</td></tr>
+        <tr><td><code>animateScrollToPage(n)</code></td><td>Cuộn có hiệu ứng tới trang <code>n</code> (hàm suspend).</td></tr>
+        <tr><td><code>scrollToPage(n)</code></td><td>Nhảy ngay tới trang <code>n</code>, không hiệu ứng (hàm suspend).</td></tr>
+      </tbody>
+    </table></div>
+    <div class="table-wrap"><table>
+      <thead>
+        <tr><th>Tham số của Pager</th><th>Dùng để</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>contentPadding</code></td><td>Thêm lề hai bên; kết hợp với <code>pageSpacing</code> để <strong>lộ một phần trang bên cạnh</strong>, gợi ý người dùng còn trang để vuốt.</td></tr>
+        <tr><td><code>pageSpacing</code></td><td>Khoảng cách giữa hai trang.</td></tr>
+        <tr><td><code>pageSize</code></td><td><code>PageSize.Fill</code> (mặc định, mỗi trang rộng bằng Pager) hoặc <code>PageSize.Fixed(200.dp)</code>.</td></tr>
+        <tr><td><code>beyondViewportPageCount</code></td><td>Số trang được dựng sẵn ở mỗi bên ngoài vùng nhìn thấy (mặc định 0). Tăng lên khi trang cần tải trước, nhưng tốn bộ nhớ hơn. Ở bản Compose cũ tham số này tên là <code>beyondBoundsPageCount</code>.</td></tr>
+        <tr><td><code>userScrollEnabled</code></td><td>Đặt <code>false</code> để chặn vuốt tay, chỉ cho chuyển trang bằng code.</td></tr>
+        <tr><td><code>key</code></td><td>Khóa ổn định cho từng trang, giống <code>key</code> trong <a href="#lazy-list">LazyColumn</a>.</td></tr>
+      </tbody>
+    </table></div>
+    <p class="code-caption">Lộ trang hai bên cho băng chuyền khuyến mãi:</p>
+    <pre><code class="language-kotlin">HorizontalPager(
+    state = pagerState,
+    contentPadding = PaddingValues(horizontal = 32.dp),
+    pageSpacing = 12.dp
+) { page -&gt;
+    PromoCard(promos[page])
+}</code></pre>
+
+    <h4>FlowRow và FlowColumn</h4>
+    <ul>
+      <li><code>horizontalArrangement</code>: cách xếp và khoảng cách giữa các phần tử trong một hàng, ví dụ <code>Arrangement.spacedBy(8.dp)</code>.</li>
+      <li><code>verticalArrangement</code>: khoảng cách giữa các hàng với nhau.</li>
+      <li><code>maxItemsInEachRow</code>: giới hạn số phần tử mỗi hàng; đủ số này thì xuống hàng dù vẫn còn chỗ. <code>FlowColumn</code> có tham số tương ứng là <code>maxItemsInEachColumn</code>.</li>
+      <li>Bên trong <code>FlowRow</code> vẫn dùng được <code>Modifier.weight(1f)</code> để các phần tử trong cùng hàng chia đều phần rộng còn lại.</li>
+    </ul>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>Ví dụ 1: Chỉ báo trang dạng chấm tròn</h4>
+    <pre><code class="language-kotlin">@Composable
+fun PageIndicator(pageCount: Int, currentPage: Int, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        repeat(pageCount) { index -&gt;
+            val selected = index == currentPage
+            Box(
+                modifier = Modifier
+                    .size(if (selected) 10.dp else 8.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (selected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.outlineVariant
+                    )
+            )
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Một hàng chấm tròn nhỏ; chấm ứng với trang hiện tại to hơn và có màu chủ đạo, các chấm còn lại màu xám nhạt.</p>
+
+    <h4>Ví dụ 2: Màn giới thiệu (onboarding) 3 trang</h4>
+    <pre><code class="language-kotlin">data class IntroPage(val title: String, val description: String)
+
+private val introPages = listOf(
+    IntroPage("Ghi chú thật nhanh", "Lưu lại ý tưởng chỉ với một chạm, kể cả khi không có mạng."),
+    IntroPage("Sắp xếp bằng thẻ", "Gắn thẻ cho ghi chú để tìm lại trong vài giây."),
+    IntroPage("Đồng bộ mọi nơi", "Ghi chú tự có mặt trên điện thoại và máy tính bảng của bạn.")
+)
+
+@Composable
+fun OnboardingScreen(onFinish: () -&gt; Unit) {
+    val pagerState = rememberPagerState(pageCount = { introPages.size })
+    val scope = rememberCoroutineScope()
+    val isLastPage = pagerState.currentPage == introPages.lastIndex
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .safeDrawingPadding()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.weight(1f)
+        ) { page -&gt;
+            val item = introPages[page]
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(item.title, style = MaterialTheme.typography.headlineMedium)
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = item.description,
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+
+        PageIndicator(pageCount = introPages.size, currentPage = pagerState.currentPage)
+        Spacer(Modifier.height(24.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            TextButton(onClick = onFinish) { Text("Bỏ qua") }
+            Button(onClick = {
+                if (isLastPage) {
+                    onFinish()
+                } else {
+                    scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
+                }
+            }) {
+                Text(if (isLastPage) "Bắt đầu" else "Tiếp")
+            }
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun OnboardingPreview() {
+    MaterialTheme { OnboardingScreen(onFinish = {}) }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Màn hình hiển thị trang "Ghi chú thật nhanh", bên dưới là 3 chấm tròn và hai nút "Bỏ qua" / "Tiếp". Vuốt ngang hoặc bấm "Tiếp" để sang trang sau với hiệu ứng trượt; chấm tròn đổi theo. Ở trang cuối, nút đổi thành "Bắt đầu" và gọi <code>onFinish</code>.</p>
+
+    <h4>Ví dụ 3: Đám mây thẻ với FlowRow và FilterChip</h4>
+    <pre><code class="language-kotlin">@Composable
+fun TagCloud(tags: List&lt;String&gt;, modifier: Modifier = Modifier) {
+    var selected by remember { mutableStateOf(setOf&lt;String&gt;()) }
+
+    FlowRow(
+        modifier = modifier.padding(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        tags.forEach { tag -&gt;
+            val isSelected = tag in selected
+            FilterChip(
+                selected = isSelected,
+                onClick = { selected = if (isSelected) selected - tag else selected + tag },
+                label = { Text(tag) },
+                leadingIcon = if (isSelected) {
+                    {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_check),
+                            contentDescription = null,
+                            modifier = Modifier.size(FilterChipDefaults.IconSize)
+                        )
+                    }
+                } else {
+                    null
+                }
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, widthDp = 360)
+@Composable
+fun TagCloudPreview() {
+    MaterialTheme {
+        TagCloud(listOf("Công việc", "Cá nhân", "Du lịch", "Ý tưởng", "Mua sắm", "Sức khỏe", "Học tập", "Gia đình"))
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Các thẻ xếp thành hàng, hết chỗ thì tự xuống dòng. Chạm vào một thẻ sẽ tô màu nó và hiện dấu tích bên trái; chạm lần nữa để bỏ chọn. Có thể chọn nhiều thẻ cùng lúc.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li><code>animateScrollToPage</code> là hàm <code>suspend</code>: chỉ gọi trong coroutine (từ <code>rememberCoroutineScope</code> trong sự kiện bấm, hoặc trong <code>LaunchedEffect</code>), không gọi trực tiếp trong thân hàm Composable.</li>
+      <li>Muốn làm việc gì đó mỗi khi đổi trang (ghi log, tải dữ liệu), hãy theo dõi <code>settledPage</code> thay vì <code>currentPage</code>, vì <code>currentPage</code> đổi ngay giữa lúc vuốt. Cách theo dõi: <code>LaunchedEffect(pagerState) { snapshotFlow { pagerState.settledPage }.collect { … } }</code> (xem <a href="#side-effects">Side effects</a>).</li>
+      <li><code>rememberPagerState</code> đã tự lưu trang hiện tại qua xoay màn hình, bạn không cần tự lưu thêm.</li>
+      <li>Đặt <code>VerticalPager</code> bên trong vùng cuộn dọc (như <code>LazyColumn</code>) thì phải cho nó một chiều cao cụ thể, nếu không sẽ lỗi đo "chiều cao vô hạn".</li>
+      <li><code>FlowRow</code>/<code>FlowColumn</code> <strong>không phải layout lazy</strong>: mọi phần tử đều được dựng cùng lúc. Chỉ dùng cho vài chục phần tử; danh sách dài hãy dùng <a href="#lazy-grid">LazyVerticalGrid</a>.</li>
+      <li>Ở các bản Compose cũ, <code>FlowRow</code>/<code>FlowColumn</code> cần <code>@OptIn(ExperimentalLayoutApi::class)</code>. Nếu IDE báo API thử nghiệm với phiên bản bạn đang dùng, thêm annotation này vào hàm.</li>
+    </ul>
+    <div class="callout tip"><strong>Mẹo:</strong> Đừng tăng <code>beyondViewportPageCount</code> chỉ để "cho mượt". Mỗi trang dựng sẵn đều tốn bộ nhớ và thời gian; Pager vốn đã tự tải trước (prefetch) trang kế tiếp khi bạn bắt đầu vuốt.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/layouts/pager" target="_blank" rel="noopener">Pager in Compose</a>, <a href="https://developer.android.com/develop/ui/compose/layouts/flow" target="_blank" rel="noopener">Flow layouts</a></p>
+</section>

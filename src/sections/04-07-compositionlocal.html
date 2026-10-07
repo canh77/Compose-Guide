@@ -1,0 +1,157 @@
+<section class="topic" id="compositionlocal" data-title="CompositionLocal">
+  <h2>CompositionLocal: truyền dữ liệu ngầm qua cây UI</h2>
+  <p class="lead">CompositionLocal cho phép một giá trị "chảy" xuống mọi composable bên dưới mà không phải truyền qua tham số ở từng tầng. Đây chính là cơ chế giúp <code>MaterialTheme</code>, <code>LocalContext</code> hoạt động.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p>Trong Compose, dữ liệu thường đi từ trên xuống qua tham số. Cách này rõ ràng, nhưng với những giá trị mà gần như mọi composable đều cần (màu chữ, kiểu chữ, mật độ điểm ảnh, <code>Context</code>), việc truyền qua mười tầng hàm chỉ để tầng cuối dùng sẽ rất rườm rà. Hiện tượng này thường được gọi là "khoan tham số" (prop drilling).</p>
+    <p><strong>CompositionLocal</strong> là một "khe" dữ liệu gắn với một nhánh của cây UI. Một composable ở trên <em>cung cấp</em> giá trị, mọi composable bên trong nhánh đó có thể <em>đọc</em> bằng <code>.current</code> mà không cần tham số. Khi đọc, Compose tìm nơi cung cấp gần nhất phía trên; nếu không có thì dùng giá trị mặc định.</p>
+    <p>Nếu bạn quen hệ View, hãy nghĩ tới thuộc tính theme như <code>?attr/colorPrimary</code>: View không nhận màu qua tham số mà tự tra theme đang áp dụng. CompositionLocal là phiên bản tổng quát hơn của ý tưởng đó, và có thể đổi giá trị cho từng vùng nhỏ của màn hình.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>Đọc giá trị có sẵn</h4>
+    <p>Gọi <code>.current</code> trong thân composable, ví dụ <code>val context = LocalContext.current</code>. Các CompositionLocal hay dùng:</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>CompositionLocal</th><th>Kiểu giá trị</th><th>Dùng để</th></tr></thead>
+      <tbody>
+        <tr><td><code>LocalContext</code></td><td><code>Context</code></td><td>Lấy tài nguyên, khởi chạy Intent, hiện Toast</td></tr>
+        <tr><td><code>LocalConfiguration</code></td><td><code>Configuration</code></td><td>Hướng màn hình, locale, chế độ tối của hệ thống</td></tr>
+        <tr><td><code>LocalDensity</code></td><td><code>Density</code></td><td>Đổi <code>dp</code> ↔ <code>px</code>: <code>with(LocalDensity.current) { 16.dp.toPx() }</code></td></tr>
+        <tr><td><code>LocalLayoutDirection</code></td><td><code>LayoutDirection</code></td><td>Biết bố cục trái→phải hay phải→trái (Ltr/Rtl)</td></tr>
+        <tr><td><code>LocalLifecycleOwner</code></td><td><code>LifecycleOwner</code></td><td>Theo dõi vòng đời (nằm trong <code>androidx.lifecycle.compose</code>)</td></tr>
+        <tr><td><code>LocalContentColor</code></td><td><code>Color</code></td><td>Màu mặc định cho <code>Text</code>, <code>Icon</code> trong vùng hiện tại</td></tr>
+        <tr><td><code>LocalTextStyle</code></td><td><code>TextStyle</code></td><td>Kiểu chữ mặc định cho <code>Text</code></td></tr>
+        <tr><td><code>LocalUriHandler</code></td><td><code>UriHandler</code></td><td>Mở đường dẫn web: <code>openUri(url)</code></td></tr>
+        <tr><td><code>LocalFocusManager</code></td><td><code>FocusManager</code></td><td>Bỏ focus (<code>clearFocus()</code>), chuyển focus sang ô kế tiếp</td></tr>
+        <tr><td><code>LocalSoftwareKeyboardController</code></td><td><code>SoftwareKeyboardController?</code></td><td>Ẩn/hiện bàn phím ảo (giá trị có thể <code>null</code>)</td></tr>
+        <tr><td><code>LocalInspectionMode</code></td><td><code>Boolean</code></td><td><code>true</code> khi đang chạy trong Preview của Android Studio</td></tr>
+      </tbody>
+    </table></div>
+
+    <h4>Cung cấp giá trị cho một vùng</h4>
+    <pre><code class="language-kotlin">CompositionLocalProvider(LocalContentColor provides Color(0xFF2E7D32)) {
+    Text("Đã giao hàng")   // chữ màu xanh lá
+    CompositionLocalProvider(LocalContentColor provides Color.Gray) {
+        Text("Lúc 14:30")   // nhà cung cấp bên trong ghi đè: chữ xám
+    }
+}</code></pre>
+    <p>Có thể cung cấp nhiều giá trị cùng lúc: <code>CompositionLocalProvider(LocalA provides a, LocalB provides b) { … }</code>. Giá trị chỉ có hiệu lực bên trong lambda nội dung.</p>
+
+    <h4>Tạo CompositionLocal của riêng bạn</h4>
+    <p>Khai báo ở cấp cao nhất của file, đặt tên bắt đầu bằng <code>Local</code>, kèm giá trị mặc định (hoặc <code>error(…)</code> nếu bắt buộc phải được cung cấp). Có hai hàm tạo:</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th></th><th><code>compositionLocalOf</code></th><th><code>staticCompositionLocalOf</code></th></tr></thead>
+      <tbody>
+        <tr><td>Khi giá trị cung cấp thay đổi</td><td>Chỉ recompose những nơi đọc <code>.current</code></td><td>Recompose toàn bộ nội dung bên trong provider</td></tr>
+        <tr><td>Chi phí</td><td>Compose phải theo dõi từng nơi đọc</td><td>Không theo dõi nơi đọc nên nhẹ hơn</td></tr>
+        <tr><td>Phù hợp với</td><td>Giá trị có thể đổi khi app chạy</td><td>Giá trị hầu như không đổi (khoảng cách thiết kế, logger)</td></tr>
+        <tr><td>Ví dụ trong framework</td><td><code>LocalContentColor</code></td><td><code>LocalContext</code></td></tr>
+      </tbody>
+    </table></div>
+
+    <h4>MaterialTheme cũng là CompositionLocal</h4>
+    <p><code>MaterialTheme(colorScheme = …, typography = …) { … }</code> thực chất cung cấp các CompositionLocal nội bộ. Khi bạn viết <code>MaterialTheme.colorScheme.primary</code>, getter này đọc <code>.current</code> của CompositionLocal tương ứng. Vì vậy có thể bọc một phần màn hình trong <code>MaterialTheme</code> khác để đổi màu riêng vùng đó (xem <a href="#custom-theme">Tùy biến theme</a>).</p>
+
+    <h4>Khi nào KHÔNG nên dùng</h4>
+    <p>CompositionLocal làm phụ thuộc trở nên "vô hình": nhìn chữ ký hàm không biết nó cần gì. Chỉ dùng cho giá trị mang tính <em>hạ tầng/giao diện</em>, có giá trị mặc định hợp lý và được nhiều nơi dùng. Dữ liệu nghiệp vụ (danh sách sản phẩm, người dùng đang đăng nhập) và ViewModel nên được truyền rõ ràng qua tham số (xem <a href="#state-hoisting">State hoisting</a>, <a href="#viewmodel">ViewModel</a>).</p>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>1. Đổi màu nội dung một vùng cảnh báo</h4>
+    <pre><code class="language-kotlin">@Composable
+fun LowBatteryBanner() {
+    Column(Modifier.fillMaxWidth().padding(16.dp)) {
+        Text("Thiết bị")
+        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.error) {
+            Text("Pin còn 5%", style = MaterialTheme.typography.titleMedium)
+            Text("Hãy cắm sạc để tránh mất dữ liệu")
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun LowBatteryBannerPreview() {
+    MaterialTheme { LowBatteryBanner() }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Dòng "Thiết bị" có màu chữ mặc định; hai dòng bên trong provider hiển thị màu đỏ báo lỗi của theme mà không cần truyền <code>color</code> cho từng <code>Text</code>. Một <code>Icon</code> đặt trong vùng này cũng tự lấy màu đó.</p>
+
+    <h4>2. Tự tạo LocalSpacing cho khoảng cách thiết kế</h4>
+    <pre><code class="language-kotlin">@Immutable
+data class Spacing(
+    val small: Dp = 4.dp,
+    val medium: Dp = 8.dp,
+    val large: Dp = 16.dp
+)
+
+// Gần như không đổi khi chạy nên dùng bản static
+val LocalSpacing = staticCompositionLocalOf { Spacing() }
+
+@Composable
+fun ShopTheme(compact: Boolean = false, content: @Composable () -&gt; Unit) {
+    val spacing = if (compact) Spacing(small = 2.dp, medium = 4.dp, large = 8.dp) else Spacing()
+    MaterialTheme {
+        CompositionLocalProvider(LocalSpacing provides spacing, content = content)
+    }
+}
+
+@Composable
+fun ProductCard(name: String, price: String) {
+    val spacing = LocalSpacing.current
+    Card(Modifier.fillMaxWidth().padding(spacing.medium)) {
+        Column(Modifier.padding(spacing.large)) {
+            Text(name, style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(spacing.small))
+            Text(price, color = MaterialTheme.colorScheme.primary)
+        }
+    }
+}
+
+@Preview
+@Composable
+fun ProductCardPreview() {
+    ShopTheme(compact = true) { ProductCard("Áo khoác gió", "450.000 đ") }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Thẻ sản phẩm dùng khoảng cách lấy từ <code>LocalSpacing</code>. Đổi <code>compact = true</code> ở <code>ShopTheme</code> làm mọi thẻ bên trong gọn lại mà không phải sửa từng composable.</p>
+
+    <h4>3. Ẩn bàn phím khi bấm Tìm kiếm</h4>
+    <pre><code class="language-kotlin">@Composable
+fun SearchBox(onSearch: (String) -&gt; Unit) {
+    var query by rememberSaveable { mutableStateOf("") }
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+
+    OutlinedTextField(
+        value = query,
+        onValueChange = { query = it },
+        label = { Text("Tìm sản phẩm") },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = {
+            keyboard?.hide()
+            focusManager.clearFocus()
+            onSearch(query)
+        }),
+        modifier = Modifier.fillMaxWidth()
+    )
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Khi người dùng bấm phím Tìm trên bàn phím, bàn phím đóng lại, ô nhập mất focus và hàm <code>onSearch</code> nhận từ khóa.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li><code>.current</code> chỉ gọi được trong composable. Muốn dùng trong <code>onClick</code>, hãy đọc ra biến trước (<code>val context = LocalContext.current</code>) rồi dùng biến đó trong lambda.</li>
+      <li>Không dùng CompositionLocal để truyền ViewModel, repository hay dữ liệu màn hình. Phụ thuộc ẩn khiến composable khó hiểu, khó Preview và khó test.</li>
+      <li>Dùng <code>staticCompositionLocalOf</code> cho giá trị đổi thường xuyên sẽ recompose cả nhánh bên dưới mỗi lần đổi. Giá trị hay đổi thì chọn <code>compositionLocalOf</code>.</li>
+      <li>Đặt giá trị mặc định có ý nghĩa. Nếu không có mặc định hợp lý, dùng <code>error("Chưa cung cấp LocalX")</code> để phát hiện sớm việc quên provider, kể cả trong Preview.</li>
+      <li><code>LocalContext.current</code> không phải lúc nào cũng là <code>Activity</code> (có thể là <code>ContextWrapper</code>); đừng ép kiểu thẳng sang <code>Activity</code>.</li>
+    </ul>
+    <div class="callout tip"><strong>Mẹo:</strong> Dùng <code>LocalInspectionMode.current</code> để thay thành phần cần thiết bị thật (bản đồ, camera) bằng một khung giả khi chạy Preview.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/compositionlocal" target="_blank" rel="noopener">Locally scoped data with CompositionLocal</a></p>
+</section>

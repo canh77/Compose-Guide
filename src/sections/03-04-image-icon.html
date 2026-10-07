@@ -1,0 +1,237 @@
+<section class="topic" id="image-icon" data-title="Image &amp; Icon">
+  <h2>Image, Icon và tải ảnh từ mạng</h2>
+  <p class="lead">Ảnh đại diện, ảnh sản phẩm, icon trên nút: hình ảnh làm giao diện dễ hiểu và hấp dẫn hơn. Phần này hướng dẫn hiển thị ảnh có sẵn trong app, dùng icon đúng chuẩn và tải ảnh từ Internet một cách hiệu quả.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p><code>Image</code> là composable vẽ một hình (ảnh chụp, hình minh họa) lên màn hình, tương đương <code>ImageView</code> trong hệ View. <code>Icon</code> là composable chuyên cho biểu tượng nhỏ, đơn sắc: nó tự tô màu theo màu nội dung hiện tại và có kích thước mặc định chuẩn Material.</p>
+    <p>Compose có ba cách biểu diễn hình ảnh:</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Kiểu</th><th>Bản chất</th><th>Tạo từ đâu</th></tr></thead>
+      <tbody>
+        <tr><td><code>ImageBitmap</code></td><td>Ảnh dạng điểm ảnh (raster) như PNG, JPG, WebP</td><td><code>ImageBitmap.imageResource(R.drawable.x)</code>, hoặc <code>bitmap.asImageBitmap()</code> từ <code>Bitmap</code> Android</td></tr>
+        <tr><td><code>ImageVector</code></td><td>Ảnh vector (đường nét, hình học), phóng to không vỡ</td><td><code>ImageVector.vectorResource(R.drawable.x)</code> từ file vector XML</td></tr>
+        <tr><td><code>Painter</code></td><td>Lớp trừu tượng "thứ gì đó vẽ được"; bọc được cả hai loại trên</td><td><code>painterResource(R.drawable.x)</code> – tự nhận biết file là bitmap hay vector</td></tr>
+      </tbody>
+    </table></div>
+    <p>Trong đa số trường hợp bạn chỉ cần <code>painterResource()</code>. Ảnh từ mạng thì Compose không tự tải; bạn dùng thư viện <strong>Coil</strong> (Coroutine Image Loader), thư viện tải ảnh viết bằng Kotlin, hỗ trợ Compose sẵn.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>Hiển thị ảnh trong app</h4>
+    <p>Đặt file vào <code>res/drawable</code> rồi gọi:</p>
+    <pre><code class="language-kotlin">Image(
+    painter = painterResource(R.drawable.banner_sale),
+    contentDescription = "Khuyến mãi mùa hè giảm đến 50%",
+    contentScale = ContentScale.Crop,
+    modifier = Modifier
+        .fillMaxWidth()
+        .aspectRatio(16f / 9f)
+)</code></pre>
+    <p><code>contentDescription</code> là câu mô tả ảnh cho trình đọc màn hình (TalkBack). Ảnh mang thông tin thì mô tả ngắn gọn nội dung; ảnh <strong>chỉ để trang trí</strong> (hoa văn nền, hình minh họa lặp lại ý của chữ bên cạnh) thì truyền <code>null</code> để TalkBack bỏ qua.</p>
+
+    <h4>ContentScale: ảnh co giãn thế nào trong khung</h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Giá trị</th><th>Cách hoạt động</th><th>Hợp với</th></tr></thead>
+      <tbody>
+        <tr><td><code>ContentScale.Fit</code> (mặc định)</td><td>Thu/phóng giữ tỉ lệ để thấy trọn ảnh; có thể chừa khoảng trống</td><td>Ảnh sản phẩm cần thấy đầy đủ</td></tr>
+        <tr><td><code>ContentScale.Crop</code></td><td>Giữ tỉ lệ, phủ kín khung, cắt phần thừa</td><td>Avatar, ảnh bìa, ảnh trong thẻ</td></tr>
+        <tr><td><code>ContentScale.FillBounds</code></td><td>Kéo giãn cho khít khung, <em>không</em> giữ tỉ lệ (ảnh có thể méo)</td><td>Hình nền dạng họa tiết, gradient</td></tr>
+        <tr><td><code>ContentScale.FillWidth</code></td><td>Giữ tỉ lệ, chiều rộng ảnh bằng khung (chiều cao có thể tràn và bị cắt)</td><td>Banner rộng hết màn hình</td></tr>
+        <tr><td><code>ContentScale.FillHeight</code></td><td>Giữ tỉ lệ, chiều cao ảnh bằng khung</td><td>Ảnh trong hàng ngang cố định chiều cao</td></tr>
+        <tr><td><code>ContentScale.Inside</code></td><td>Giống <code>Fit</code> nhưng chỉ thu nhỏ, không bao giờ phóng to ảnh nhỏ</td><td>Logo nhỏ, tránh bị mờ vì phóng to</td></tr>
+        <tr><td><code>ContentScale.None</code></td><td>Giữ nguyên kích thước gốc, chỉ căn theo <code>alignment</code></td><td>Trường hợp đặc biệt, ít dùng</td></tr>
+      </tbody>
+    </table></div>
+
+    <h4>Bo tròn, viền, tỉ lệ khung, màu và độ mờ</h4>
+    <ul>
+      <li><code>Modifier.clip(CircleShape)</code> hoặc <code>clip(RoundedCornerShape(12.dp))</code>: cắt ảnh theo hình tròn / bo góc.</li>
+      <li><code>Modifier.border(2.dp, color, CircleShape)</code>: viền ôm theo cùng hình dạng.</li>
+      <li><code>Modifier.aspectRatio(1f)</code>: giữ khung vuông (hoặc <code>16f / 9f</code>…) bất kể chiều rộng.</li>
+      <li><code>colorFilter = ColorFilter.tint(color)</code>: tô một màu lên ảnh; <code>ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) })</code>: biến ảnh thành đen trắng (ví dụ sản phẩm hết hàng).</li>
+      <li><code>alpha = 0.5f</code>: làm ảnh mờ một nửa.</li>
+    </ul>
+    <p>Thứ tự modifier có ý nghĩa (xem <a href="#modifier">Modifier</a>): đặt kích thước trước, rồi <code>clip</code>, rồi <code>border</code>.</p>
+
+    <h4>Icon</h4>
+    <pre><code class="language-kotlin">Icon(
+    painter = painterResource(R.drawable.ic_favorite), // icon tải về, tên giả định
+    contentDescription = "Yêu thích",
+    tint = MaterialTheme.colorScheme.error,
+    modifier = Modifier.size(20.dp)
+)</code></pre>
+    <ul>
+      <li>Màu (<code>tint</code>) mặc định lấy từ <code>LocalContentColor</code>, tức màu nội dung của vùng chứa: đặt icon trong <code>Button</code> thì icon tự có màu chữ của nút. Muốn giữ màu gốc của hình nhiều màu (logo), dùng <code>tint = Color.Unspecified</code>.</li>
+      <li>Kích thước: icon Material có kích thước gốc 24dp; hình không có kích thước gốc thì <code>Icon</code> cũng mặc định 24dp. Đổi bằng <code>Modifier.size(…)</code>.</li>
+    </ul>
+
+    <h4>Lấy icon: dùng Material Symbols dạng XML</h4>
+    <p>Nhiều hướng dẫn cũ dùng thư viện <code>material-icons-extended</code> (<code>Icons.Filled.…</code>, <code>Icons.Outlined.…</code>). Thư viện này <strong>không còn được duy trì và không còn được khuyến nghị</strong>: nó chứa hàng nghìn icon bạn không dùng tới, làm thời gian build chậm đi đáng kể, và không có các icon mới. Cách nên làm:</p>
+    <ol>
+      <li>Vào trang Material Symbols trên Google Fonts (<code>fonts.google.com/icons</code>), chọn icon, chỉnh kiểu (Outlined/Rounded/Sharp, độ đậm, Fill).</li>
+      <li>Trong khung chi tiết, chọn tab <strong>Android</strong> và tải file vector XML.</li>
+      <li>Chép file vào <code>res/drawable</code>, đặt tên dễ nhớ như <code>ic_favorite.xml</code>.</li>
+      <li>Dùng: <code>Icon(painter = painterResource(R.drawable.ic_favorite), contentDescription = …)</code>.</li>
+    </ol>
+    <p>Bạn chỉ thêm đúng những icon cần dùng, file nhỏ và vẽ sắc nét ở mọi mật độ màn hình. Trong hướng dẫn này, các tên như <code>R.drawable.ic_search</code> là tên giả định cho icon đã tải theo cách trên.</p>
+
+    <h4>Tải ảnh từ mạng với Coil 3</h4>
+    <p>Bước 1 – thêm thư viện. Ví dụ dùng version catalog (xem <a href="#thiet-lap-du-an">Thiết lập dự án</a>); điền phiên bản Coil 3 mới nhất từ trang chủ Coil:</p>
+    <p class="code-caption">gradle/libs.versions.toml</p>
+    <pre><code class="language-toml">[versions]
+coil = "..." # điền phiên bản Coil 3 mới nhất
+
+[libraries]
+coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
+coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coil" }</code></pre>
+    <p class="code-caption">app/build.gradle.kts</p>
+    <pre><code class="language-kotlin">dependencies {
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp) // cần để tải ảnh qua http/https
+}</code></pre>
+    <p>Bước 2 – khai báo quyền Internet trong <code>AndroidManifest.xml</code>:</p>
+    <pre><code class="language-markup">&lt;manifest xmlns:android="http://schemas.android.com/apk/res/android"&gt;
+    &lt;uses-permission android:name="android.permission.INTERNET" /&gt;
+    &lt;application ...&gt;
+        ...
+    &lt;/application&gt;
+&lt;/manifest&gt;</code></pre>
+    <p>Bước 3 – dùng <code>AsyncImage</code>. Nó tải ảnh ở luồng nền, lưu cache, và tự thu nhỏ ảnh về đúng kích thước khung hiển thị:</p>
+    <pre><code class="language-kotlin">AsyncImage(
+    model = "https://example.com/anh/san-pham-01.jpg",
+    contentDescription = "Áo khoác gió màu xanh",
+    placeholder = painterResource(R.drawable.img_placeholder), // hiện trong lúc tải
+    error = painterResource(R.drawable.img_error),             // hiện khi tải lỗi
+    contentScale = ContentScale.Crop,
+    modifier = Modifier.size(120.dp)
+)</code></pre>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>Ví dụ 1: Avatar tròn có chấm trạng thái trực tuyến</h4>
+    <pre><code class="language-kotlin">@Composable
+fun UserAvatar(
+    @DrawableRes imageRes: Int,
+    userName: String,
+    isOnline: Boolean,
+    modifier: Modifier = Modifier,
+    size: Dp = 56.dp
+) {
+    Box(modifier = modifier.size(size)) {
+        Image(
+            painter = painterResource(imageRes),
+            contentDescription = "Ảnh đại diện của $userName",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .matchParentSize()
+                .clip(CircleShape)
+                .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
+        )
+        if (isOnline) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .size(size / 4)
+                    .clip(CircleShape)
+                    .background(Color(0xFF2E7D32))
+                    .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape)
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun UserAvatarPreview() {
+    MaterialTheme {
+        UserAvatar(imageRes = R.drawable.avatar_lan, userName = "Lan", isOnline = true)
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Ảnh đại diện hình tròn 56dp, được cắt kín khung (không méo), có viền màu chủ đạo. Ở góc dưới phải có một chấm tròn xanh lá với viền cùng màu nền, báo hiệu người dùng đang trực tuyến.</p>
+
+    <h4>Ví dụ 2: Hàng thông tin thời tiết dùng Icon</h4>
+    <pre><code class="language-kotlin">@Composable
+fun WeatherStat(@DrawableRes iconRes: Int, label: String, value: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            painter = painterResource(iconRes),
+            contentDescription = null, // chữ bên cạnh đã mô tả đủ
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(Modifier.width(8.dp))
+        Text("$label: ", style = MaterialTheme.typography.bodyMedium)
+        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+fun WeatherDetails(modifier: Modifier = Modifier) {
+    // Các icon Material Symbols tải về res/drawable (tên giả định)
+    Column(modifier = modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        WeatherStat(R.drawable.ic_humidity, "Độ ẩm", "78%")
+        WeatherStat(R.drawable.ic_air, "Gió", "12 km/h")
+        WeatherStat(R.drawable.ic_sunny, "Chỉ số UV", "6 (Cao)")
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Ba dòng xếp dọc, mỗi dòng có icon nhỏ 20dp màu chủ đạo, theo sau là nhãn thường và giá trị in đậm: "Độ ẩm: <strong>78%</strong>", "Gió: <strong>12 km/h</strong>", "Chỉ số UV: <strong>6 (Cao)</strong>". Ở chế độ tối, icon tự đổi sang tông màu primary của theme tối.</p>
+
+    <h4>Ví dụ 3: Thẻ bài viết với ảnh bìa tải từ mạng</h4>
+    <pre><code class="language-kotlin">import coil3.compose.AsyncImage
+
+@Composable
+fun ArticleCard(
+    title: String,
+    author: String,
+    coverUrl: String,
+    onClick: () -&gt; Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(onClick = onClick, modifier = modifier.fillMaxWidth()) {
+        AsyncImage(
+            model = coverUrl,
+            contentDescription = null, // tiêu đề bên dưới đã nói nội dung bài
+            placeholder = painterResource(R.drawable.img_placeholder),
+            error = painterResource(R.drawable.img_error),
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(16f / 9f)
+        )
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "Bởi $author",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Một thẻ bo góc rộng hết màn hình. Phần trên là ảnh bìa tỉ lệ 16:9: lúc đầu hiện ảnh chờ <code>img_placeholder</code>, tải xong thì hiện ảnh thật được cắt vừa khung; nếu mất mạng hoặc URL hỏng thì hiện <code>img_error</code>. Phần dưới là tiêu đề tối đa hai dòng và tên tác giả màu xám. Chạm vào thẻ sẽ gọi <code>onClick</code> (xem thêm <a href="#card-chip">Card và Chip</a>).</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li><strong>Đừng nhét ảnh quá lớn vào <code>res/drawable</code>.</strong> <code>painterResource</code> giải mã ảnh ở độ phân giải đầy đủ; một ảnh 4000×3000 chiếm khoảng 48 MB bộ nhớ khi giải mã, dễ gây giật hoặc lỗi hết bộ nhớ (OOM). Hãy thu ảnh về đúng kích thước hiển thị, đặt vào thư mục mật độ phù hợp (<code>drawable-xxhdpi</code>…), và chuyển sang <strong>WebP</strong> (Android Studio: chuột phải vào ảnh, chọn <em>Convert to WebP</em>) để giảm dung lượng APK.</li>
+      <li>Icon và hình minh họa đơn giản nên dùng <strong>vector XML</strong> thay vì PNG: nhẹ hơn và sắc nét ở mọi màn hình.</li>
+      <li><code>painterResource</code> chỉ hỗ trợ ảnh bitmap (PNG, JPG, WebP…) và vector drawable. Các loại drawable XML khác như <code>shape</code>, <code>layer-list</code>, <code>selector</code> sẽ gây lỗi; trong Compose hãy vẽ chúng bằng <code>Modifier.background</code>, <code>clip</code> hoặc <code>Canvas</code> (xem <a href="#graphics">Đồ họa</a>).</li>
+      <li>Quên thêm thư viện <code>coil-network-okhttp</code> hoặc quyền <code>INTERNET</code> là lỗi phổ biến nhất khiến <code>AsyncImage</code> chỉ hiện ảnh lỗi/placeholder mà không báo gì rõ ràng.</li>
+      <li>Ảnh mạng nên luôn có <code>placeholder</code> và <code>error</code>, và khung ảnh nên có kích thước cố định hoặc <code>aspectRatio</code>, để bố cục không "nhảy" khi ảnh tải xong.</li>
+      <li><code>contentDescription</code> không phải tùy chọn cho có: ảnh mang thông tin phải được mô tả, ảnh trang trí đặt <code>null</code>. Không viết kiểu "ảnh", "icon" vì vô nghĩa với người dùng TalkBack (xem <a href="#accessibility">Accessibility</a>).</li>
+    </ul>
+    <div class="callout tip"><strong>Mẹo:</strong> Khi cần hiển thị một <code>Bitmap</code> bạn tự tạo (ví dụ ảnh chụp từ camera), chuyển bằng <code>bitmap.asImageBitmap()</code> rồi dùng <code>Image(bitmap = …, contentDescription = …)</code>. Nhớ bọc phép chuyển hoặc giải mã trong <code>remember</code> để không lặp lại ở mỗi lần vẽ lại.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/graphics/images/loading?hl=vi" target="_blank" rel="noopener">Loading images</a></p>
+</section>

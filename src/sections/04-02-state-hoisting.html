@@ -1,0 +1,243 @@
+<section class="topic" id="state-hoisting" data-title="State hoisting">
+  <h2>State hoisting và luồng dữ liệu một chiều</h2>
+  <p class="lead">State hoisting là kỹ thuật đưa state ra khỏi một composable và giao cho nơi gọi nó quản lý, để composable chỉ việc hiển thị dữ liệu và báo sự kiện. Đây là nền móng cho luồng dữ liệu một chiều, giúp giao diện dễ tái sử dụng, dễ xem trước và dễ kiểm thử.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p>Một composable <strong>stateful</strong> (có trạng thái) tự tạo và giữ state bên trong, thường bằng <code>remember</code>. Người gọi dùng rất tiện nhưng không thể đọc hay điều khiển state đó. Ngược lại, composable <strong>stateless</strong> (không trạng thái) không giữ gì cả: mọi dữ liệu đi vào qua tham số, mọi thay đổi được báo ra ngoài qua lambda.</p>
+    <p><strong>Hoisting</strong> (nghĩa đen: "kéo lên") là chuyển một composable stateful thành stateless bằng cách thay state nội bộ bằng hai tham số: <code>value: T</code> (giá trị hiện tại cần hiển thị) và <code>onValueChange: (T) -&gt; Unit</code> (sự kiện yêu cầu đổi giá trị). Các thành phần có sẵn của Compose đều theo mẫu này: <code>Checkbox(checked, onCheckedChange)</code>, <code>Switch(checked, onCheckedChange)</code>, <code>Slider(value, onValueChange)</code>.</p>
+    <p>Lợi ích chính:</p>
+    <ul>
+      <li><strong>Một nguồn sự thật</strong> (single source of truth): state chỉ nằm ở một nơi, không có hai bản sao lệch nhau. Ở hệ View cũ, <code>EditText</code> tự giữ chữ bên trong nên rất dễ lệch với biến của bạn.</li>
+      <li><strong>Tái sử dụng:</strong> cùng một composable dùng được ở nhiều màn hình với dữ liệu khác nhau.</li>
+      <li><strong>Dễ kiểm soát:</strong> nơi giữ state có thể lọc, chặn hoặc biến đổi giá trị trước khi chấp nhận.</li>
+      <li><strong>Dễ preview và test:</strong> chỉ cần truyền dữ liệu cố định vào là thấy giao diện (xem <a href="#preview">Preview</a>, <a href="#testing">Testing</a>).</li>
+    </ul>
+    <h4>Luồng dữ liệu một chiều (UDF)</h4>
+    <p>Khi hoisting được áp dụng nhất quán, ta có <strong>Unidirectional Data Flow</strong>: <em>state đi xuống, sự kiện đi lên</em>. Một vòng diễn ra như sau:</p>
+    <ol>
+      <li>Nơi giữ state (composable cha, một state holder class hoặc ViewModel) nắm giá trị hiện tại.</li>
+      <li>State được truyền xuống composable con qua tham số, con vẽ giao diện theo đó.</li>
+      <li>Người dùng thao tác (bấm, gõ, kéo...), con <em>không tự sửa</em> state mà gọi lambda sự kiện như <code>onQueryChange("abc")</code>.</li>
+      <li>Nơi giữ state xử lý sự kiện và cập nhật state.</li>
+      <li>State mới khiến Compose recomposition các chỗ có đọc nó, giao diện hiển thị giá trị mới. Vòng lặp tiếp tục.</li>
+    </ol>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>Chuyển stateful thành stateless</h4>
+    <ol>
+      <li>Tìm state bên trong composable (ví dụ <code>var enabled by remember { ... }</code>).</li>
+      <li>Xóa nó, thêm tham số giá trị và tham số lambda sự kiện.</li>
+      <li>Chỗ nào trước đây gán state thì nay gọi lambda.</li>
+    </ol>
+    <pre><code class="language-kotlin">// Trước: stateful – người gọi không biết và không đổi được trạng thái công tắc
+@Composable
+fun NotifySetting() {
+    var enabled by remember { mutableStateOf(true) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("Nhận thông báo", Modifier.weight(1f))
+        Switch(checked = enabled, onCheckedChange = { enabled = it })
+    }
+}
+
+// Sau: stateless – nhận giá trị, báo sự kiện
+@Composable
+fun NotifySetting(
+    enabled: Boolean,
+    onEnabledChange: (Boolean) -&gt; Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Text("Nhận thông báo", Modifier.weight(1f))
+        Switch(checked = enabled, onCheckedChange = onEnabledChange)
+    }
+}</code></pre>
+
+    <h4>Quy ước tham số</h4>
+    <ul>
+      <li>Đặt cặp tên rõ nghĩa: <code>query</code>/<code>onQueryChange</code>, <code>checked</code>/<code>onCheckedChange</code>.</li>
+      <li>Lambda sự kiện bắt đầu bằng <code>on</code>: <code>onClick</code>, <code>onDelete</code>, <code>onSearch</code>.</li>
+      <li><code>modifier: Modifier = Modifier</code> là tham số tùy chọn đầu tiên.</li>
+      <li>Chỉ truyền đúng dữ liệu con cần (một <code>String</code> tên thay vì cả đối tượng lớn nếu con chỉ hiển thị tên).</li>
+    </ul>
+
+    <h4>Nâng state lên đến đâu?</h4>
+    <ol>
+      <li>Ít nhất đến <strong>tổ tiên chung thấp nhất</strong> của mọi composable cần <em>đọc</em> state đó.</li>
+      <li>Ít nhất đến cấp cao nhất cần <em>ghi</em> (thay đổi) nó.</li>
+      <li>Hai state luôn đổi cùng nhau trong một sự kiện thì nâng chúng cùng nhau.</li>
+    </ol>
+    <p>Không nâng cao hơn mức cần: state chỉ một composable dùng (như dropdown đang mở hay đóng) cứ để nguyên trong nó.</p>
+
+    <h4>Chọn nơi giữ state</h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Nơi giữ</th><th>Khi nào dùng</th><th>Ví dụ</th></tr></thead>
+      <tbody>
+        <tr><td><code>remember</code> trong composable cha</td><td>State giao diện đơn giản, vài composable dùng</td><td>Công tắc bộ lọc, tab đang chọn</td></tr>
+        <tr><td>State holder class thuần + hàm <code>rememberXxxState()</code></td><td>Logic giao diện phức tạp, nhiều state liên quan nhau</td><td>Ô tìm kiếm kèm lịch sử (Ví dụ 3)</td></tr>
+        <tr><td>ViewModel</td><td>State cấp màn hình, logic nghiệp vụ, dữ liệu từ repository, cần sống qua xoay màn hình</td><td>Danh sách sản phẩm tải từ mạng (<a href="#viewmodel">ViewModel</a>)</td></tr>
+      </tbody>
+    </table></div>
+    <p>State holder class là một class Kotlin thường chứa các state (<code>mutableStateOf</code>, <code>mutableStateListOf</code>...) cùng các hàm xử lý sự kiện, đi kèm một hàm <code>@Composable</code> tên <code>rememberXxxState()</code> để tạo và <code>remember</code> nó, giống cách Compose cung cấp <code>rememberScrollState()</code>.</p>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>Ví dụ 1: Ô tìm kiếm stateless và bản bọc stateful</h4>
+    <pre><code class="language-kotlin">import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+
+@Composable
+fun SearchBox(
+    query: String,
+    onQueryChange: (String) -&gt; Unit,
+    onSearch: () -&gt; Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            label = { Text("Tìm trong danh bạ") },
+            singleLine = true,
+            modifier = Modifier.weight(1f)
+        )
+        Spacer(Modifier.width(8.dp))
+        Button(onClick = onSearch, enabled = query.isNotBlank()) { Text("Tìm") }
+    }
+}
+
+// Bản stateful mỏng cho nơi không cần tự quản lý state
+@Composable
+fun SearchBoxStateful(onSearch: (String) -&gt; Unit, modifier: Modifier = Modifier) {
+    var query by rememberSaveable { mutableStateOf("") }
+    SearchBox(
+        query = query,
+        onQueryChange = { if (it.length &lt;= 30) query = it },  // cha quyết định có nhận hay không
+        onSearch = { onSearch(query.trim()) },
+        modifier = modifier
+    )
+}
+
+@Preview(showBackground = true)
+@Composable
+fun SearchBoxPreview() {
+    SearchBox(query = "Lan", onQueryChange = {}, onSearch = {})
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Preview hiển thị ô nhập có sẵn chữ "Lan" và nút "Tìm" sáng mà không cần chạy app. Khi dùng <code>SearchBoxStateful</code>, người dùng gõ tối đa 30 ký tự; nút "Tìm" chỉ bật khi ô không trống.</p>
+
+    <h4>Ví dụ 2: Bộ lọc và danh sách dùng chung một state</h4>
+    <pre><code class="language-kotlin">import androidx.compose.foundation.lazy.items
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+
+data class Product(val id: Int, val name: String, val inStock: Boolean)
+
+val sampleProducts = listOf(
+    Product(1, "Áo thun trắng", true),
+    Product(2, "Quần jean xanh", false),
+    Product(3, "Mũ lưỡi trai", true),
+    Product(4, "Giày vải", false)
+)
+
+@Composable
+fun StockFilter(onlyInStock: Boolean, onOnlyInStockChange: (Boolean) -&gt; Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text("Chỉ hiện món còn hàng", Modifier.weight(1f))
+        Switch(checked = onlyInStock, onCheckedChange = onOnlyInStockChange)
+    }
+}
+
+@Composable
+fun ProductList(products: List&lt;Product&gt;, modifier: Modifier = Modifier) {
+    LazyColumn(modifier) {
+        items(products, key = { it.id }) { product -&gt;
+            Text(
+                text = if (product.inStock) product.name else "${product.name} (hết hàng)",
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun ShopScreen(products: List&lt;Product&gt; = sampleProducts) {
+    // State nằm ở tổ tiên chung của StockFilter (ghi) và ProductList (đọc)
+    var onlyInStock by rememberSaveable { mutableStateOf(false) }
+    val visible = remember(products, onlyInStock) {
+        if (onlyInStock) products.filter { it.inStock } else products
+    }
+
+    Column(Modifier.padding(16.dp)) {
+        StockFilter(onlyInStock = onlyInStock, onOnlyInStockChange = { onlyInStock = it })
+        Text("Đang hiện ${visible.size}/${products.size} món", style = MaterialTheme.typography.labelLarge)
+        ProductList(products = visible)
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Bật công tắc, danh sách chỉ còn "Áo thun trắng" và "Mũ lưỡi trai", dòng đếm đổi thành "Đang hiện 2/4 món". Tắt công tắc, cả bốn món hiện lại. Hai composable con không biết nhau, chúng chỉ chia sẻ state qua cha.</p>
+
+    <h4>Ví dụ 3: State holder class cho ô tìm kiếm có lịch sử</h4>
+    <pre><code class="language-kotlin">import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+
+class SearchState(initialQuery: String = "") {
+    var query by mutableStateOf(initialQuery)
+        private set                       // bên ngoài chỉ đọc, muốn đổi phải gọi hàm
+    val history = mutableStateListOf&lt;String&gt;()
+
+    fun onQueryChange(newQuery: String) {
+        query = newQuery.take(30)
+    }
+
+    fun onSearch() {
+        val q = query.trim()
+        if (q.isEmpty()) return
+        history.remove(q)
+        history.add(0, q)
+        if (history.size &gt; 5) history.removeAt(history.lastIndex)
+    }
+}
+
+@Composable
+fun rememberSearchState(initialQuery: String = ""): SearchState =
+    remember { SearchState(initialQuery) }
+
+@Composable
+fun ContactSearch(state: SearchState = rememberSearchState()) {
+    Column(Modifier.padding(16.dp)) {
+        SearchBox(                        // dùng lại SearchBox stateless ở Ví dụ 1
+            query = state.query,
+            onQueryChange = state::onQueryChange,
+            onSearch = state::onSearch
+        )
+        Text(
+            "Tìm gần đây",
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(top = 12.dp)
+        )
+        state.history.forEach { item -&gt;
+            TextButton(onClick = { state.onQueryChange(item) }) { Text(item) }
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Mỗi lần bấm "Tìm", từ khóa được đưa lên đầu mục "Tìm gần đây" (tối đa 5 mục, không trùng lặp). Bấm vào một mục cũ, ô tìm kiếm điền lại từ khóa đó. Toàn bộ logic nằm trong <code>SearchState</code>, composable chỉ lo hiển thị.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li><strong>Mặc định viết composable tái sử dụng ở dạng stateless.</strong> Nếu cần tiện, thêm một bản stateful mỏng bọc bên ngoài như Ví dụ 1.</li>
+      <li><strong>Không truyền <code>MutableState&lt;T&gt;</code> xuống con</strong> để con tự sửa: làm vậy phá vỡ luồng một chiều, khó biết ai đã đổi state. Hãy truyền giá trị và lambda.</li>
+      <li><strong>Đừng nâng state quá cao.</strong> State nằm càng cao thì càng nhiều composable bị ảnh hưởng khi nó đổi, code cũng rối hơn.</li>
+      <li><strong>Ô nhập văn bản:</strong> Compose hiện khuyến nghị dạng <code>TextFieldState</code> (<code>rememberTextFieldState()</code>). Khi đó bạn hoist chính đối tượng <code>TextFieldState</code> thay cho cặp <code>value</code>/<code>onValueChange</code> (xem <a href="#textfield">TextField</a>).</li>
+      <li><strong>State holder class tạo bằng <code>remember</code> sẽ mất khi xoay màn hình.</strong> Muốn giữ, viết <code>Saver</code> và dùng <code>rememberSaveable</code> (xem <a href="#luu-trang-thai">Lưu trạng thái</a>).</li>
+      <li><strong>Logic nghiệp vụ</strong> (gọi API, đọc cơ sở dữ liệu, kiểm tra quy tắc) không thuộc về composable hay state holder giao diện; hãy đưa vào <a href="#viewmodel">ViewModel</a>.</li>
+      <li>Khi một composable có quá nhiều lambda, có thể gom chúng thành một <code>onEvent: (SearchEvent) -&gt; Unit</code> với <code>sealed interface SearchEvent</code>. Đây là lựa chọn phong cách, không bắt buộc.</li>
+    </ul>
+    <div class="callout tip"><strong>Mẹo:</strong> Câu hỏi nhanh để quyết định: "Có ai ngoài composable này cần đọc hoặc đổi giá trị không?" Nếu có, hãy hoist.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/state-hoisting?hl=vi" target="_blank" rel="noopener">Where to hoist state</a>, <a href="https://developer.android.com/develop/ui/compose/architecture?hl=vi" target="_blank" rel="noopener">Architecting your Compose UI</a></p>
+</section>

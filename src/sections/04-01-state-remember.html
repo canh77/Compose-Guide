@@ -1,0 +1,219 @@
+<section class="topic" id="state-remember" data-title="State &amp; remember">
+  <h2>State và remember</h2>
+  <p class="lead">State (trạng thái) là mọi dữ liệu có thể thay đổi trong lúc app chạy, và trong Compose chính state quyết định màn hình hiển thị gì. Hiểu <code>mutableStateOf</code> và <code>remember</code> là bước đầu tiên để giao diện biết phản ứng với thao tác của người dùng.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p>Trong một ứng dụng, <strong>state</strong> là bất kỳ giá trị nào có thể đổi theo thời gian: số món trong giỏ hàng, chữ người dùng đang gõ, danh sách ghi chú vừa tải về, hộp thoại đang mở hay đóng... Compose xây giao diện theo kiểu <em>khai báo</em> (declarative): bạn viết hàm mô tả "với dữ liệu này thì UI trông như thế này". Khi state đổi, Compose tự gọi lại những hàm composable có đọc state đó để vẽ lại phần giao diện liên quan. Việc gọi lại này gọi là <strong>recomposition</strong> (tái tạo giao diện, xem thêm <a href="#tu-duy-compose">Tư duy Compose</a>).</p>
+    <p>Compose chỉ theo dõi được những state <em>quan sát được</em> (observable): kiểu <code>State&lt;T&gt;</code> (chỉ đọc) và <code>MutableState&lt;T&gt;</code> (đọc và ghi), thường tạo bằng hàm <code>mutableStateOf()</code>. Khi một composable đọc thuộc tính <code>value</code>, Compose ghi nhận "hàm này phụ thuộc vào state này"; khi có nơi gán giá trị mới, đúng những chỗ đã đọc sẽ được vẽ lại, phần còn lại giữ nguyên.</p>
+    <p>Vì sao khai báo <code>var count = 0</code> bình thường trong composable không làm UI cập nhật? Có hai lý do: (1) Compose không hề biết biến đó vừa thay đổi nên không lên lịch vẽ lại; (2) mỗi lần recomposition, hàm chạy lại từ đầu và dòng <code>var count = 0</code> lại đặt giá trị về 0. <code>mutableStateOf</code> giải quyết lý do thứ nhất, còn <code>remember</code> giải quyết lý do thứ hai: nó cất giá trị vào <em>composition</em> (cây giao diện do Compose quản lý) ở lần chạy đầu tiên và trả lại chính giá trị đó ở các lần chạy sau.</p>
+    <div class="callout info"><strong>Lưu ý:</strong> Với hệ View/XML cũ, bạn tự tìm view rồi gọi <code>textView.text = "..."</code> mỗi khi dữ liệu đổi (kiểu mệnh lệnh). Trong Compose bạn không sửa view; bạn chỉ đổi state, giao diện tự đi theo.</div>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>1. Tạo state quan sát được và giữ nó bằng remember</h4>
+    <pre><code class="language-kotlin">@Composable
+fun LikeButton() {
+    val likes = remember { mutableStateOf(0) }   // kiểu MutableState&lt;Int&gt;
+    Button(onClick = { likes.value++ }) {
+        Text("Thích (${likes.value})")
+    }
+}</code></pre>
+    <p><code>remember { ... }</code> chạy khối lambda ở lần composition đầu tiên, lưu kết quả lại và trả về đúng đối tượng đó ở mọi lần recomposition sau. Giá trị bị "quên" khi composable rời khỏi giao diện (ví dụ bị ẩn bởi một nhánh <code>if</code>) và cũng mất khi Activity bị tạo lại lúc xoay màn hình. Muốn giữ qua xoay màn hình, dùng <code>rememberSaveable</code> (xem <a href="#luu-trang-thai">Lưu trạng thái</a>).</p>
+
+    <h4>2. Ba cách khai báo</h4>
+    <p class="code-caption">Ba cách viết tương đương, đặt bên trong một hàm @Composable</p>
+    <pre><code class="language-kotlin">import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+
+// Cách 1: giữ đối tượng MutableState, đọc/ghi qua .value
+val city = remember { mutableStateOf("Hà Nội") }
+Text(city.value)
+
+// Cách 2: property delegate với "by", dùng như biến thường (phổ biến nhất)
+var note by remember { mutableStateOf("") }
+Text(note)
+
+// Cách 3: tách đôi (destructuring) thành giá trị và hàm đặt giá trị
+val (query, setQuery) = remember { mutableStateOf("") }
+Text(query)</code></pre>
+    <p>Cách 2 cần hai dòng import <code>getValue</code> và <code>setValue</code>; thiếu chúng, trình biên dịch báo lỗi kiểu <em>"Property delegate must have a 'getValue' method"</em>. Cách 3 tiện khi muốn truyền thẳng <code>setQuery</code> làm callback, nhưng ít gặp hơn.</p>
+
+    <h4>3. State cho số nguyên thủy</h4>
+    <p>Với số, nên dùng <code>mutableIntStateOf</code>, <code>mutableLongStateOf</code>, <code>mutableFloatStateOf</code>, <code>mutableDoubleStateOf</code>. Chúng lưu thẳng giá trị nguyên thủy, tránh <em>autoboxing</em> (bọc số vào đối tượng như <code>Integer</code>) mỗi lần ghi. Vẫn dùng được với <code>by</code>: <code>var count by remember { mutableIntStateOf(0) }</code>. Nếu không dùng <code>by</code>, đọc/ghi qua <code>intValue</code>, <code>longValue</code>, <code>floatValue</code> hoặc <code>doubleValue</code>.</p>
+
+    <h4>4. State chứa danh sách hoặc map</h4>
+    <ul>
+      <li><strong>Collection quan sát được:</strong> <code>mutableStateListOf&lt;T&gt;()</code> và <code>mutableStateMapOf&lt;K, V&gt;()</code>. Mọi thao tác <code>add</code>, <code>remove</code>, <code>set</code>, <code>put</code> đều kích hoạt recomposition. Chuyển danh sách có sẵn bằng <code>toMutableStateList()</code>.</li>
+      <li><strong>Danh sách bất biến bọc trong state:</strong> <code>var tags by remember { mutableStateOf(listOf&lt;String&gt;()) }</code>, rồi thay cả danh sách: <code>tags = tags + "mới"</code>. Cách này hợp với data class bất biến và với ViewModel/StateFlow (xem <a href="#viewmodel">ViewModel</a>).</li>
+    </ul>
+
+    <h4>5. remember có key</h4>
+    <p><code>remember(key1, key2) { ... }</code> chạy lại lambda khi một trong các key thay đổi (so sánh bằng <code>equals</code>). Dùng để lưu kết quả tính toán tốn kém, hoặc để đặt lại state khi đầu vào đổi, ví dụ <code>var draft by remember(noteId) { mutableStateOf("") }</code> sẽ xóa bản nháp khi mở ghi chú khác.</p>
+    <pre><code class="language-kotlin">@Composable
+fun ContactList(contacts: List&lt;String&gt;, ascending: Boolean) {
+    // Chỉ sắp xếp lại khi danh sách hoặc chiều sắp xếp thay đổi
+    val sorted = remember(contacts, ascending) {
+        if (ascending) contacts.sorted() else contacts.sortedDescending()
+    }
+    Column { sorted.forEach { Text(it) } }
+}</code></pre>
+
+    <h4>6. Biến nguồn dữ liệu khác thành State</h4>
+    <pre><code class="language-kotlin">// StateFlow từ ViewModel (thư viện lifecycle-runtime-compose) – nên dùng trên Android
+val weather by viewModel.weather.collectAsStateWithLifecycle()
+
+// Flow thường cần giá trị khởi đầu
+val seconds by tickerFlow.collectAsState(initial = 0)
+
+// LiveData (thêm thư viện androidx.compose.runtime:runtime-livedata)
+val user by viewModel.userLiveData.observeAsState()</code></pre>
+    <p>Hàm <code>observeAsState</code> nằm trong gói <code>androidx.compose.runtime.livedata</code>. Với nguồn bất đồng bộ tùy ý, có thể dùng <code>produceState</code> (xem <a href="#side-effects">Side effects</a>).</p>
+
+    <h4>Bảng tóm tắt</h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Hàm</th><th>Trả về</th><th>Dùng khi</th></tr></thead>
+      <tbody>
+        <tr><td><code>mutableStateOf(v)</code></td><td><code>MutableState&lt;T&gt;</code></td><td>Giá trị bất kỳ: chuỗi, Boolean, data class...</td></tr>
+        <tr><td><code>mutableIntStateOf(v)</code> và các bản Long/Float/Double</td><td><code>MutableIntState</code>...</td><td>Số nguyên thủy, tránh autoboxing</td></tr>
+        <tr><td><code>mutableStateListOf()</code></td><td><code>SnapshotStateList&lt;T&gt;</code></td><td>Danh sách cần thêm/xóa tại chỗ</td></tr>
+        <tr><td><code>mutableStateMapOf()</code></td><td><code>SnapshotStateMap&lt;K, V&gt;</code></td><td>Map cần thêm/xóa tại chỗ</td></tr>
+        <tr><td><code>remember { }</code></td><td>Giá trị của lambda</td><td>Giữ đối tượng qua recomposition</td></tr>
+        <tr><td><code>remember(key) { }</code></td><td>Giá trị của lambda</td><td>Tính lại khi key đổi</td></tr>
+        <tr><td><code>rememberSaveable { }</code></td><td>Giá trị của lambda</td><td>Giữ qua xoay màn hình và process death (<a href="#luu-trang-thai">chi tiết</a>)</td></tr>
+        <tr><td><code>derivedStateOf { }</code></td><td><code>State&lt;T&gt;</code></td><td>Giá trị suy ra từ state đổi liên tục (<a href="#performance">hiệu năng</a>)</td></tr>
+        <tr><td><code>collectAsStateWithLifecycle()</code></td><td><code>State&lt;T&gt;</code></td><td>Flow sang State, tự dừng khi app ở nền</td></tr>
+        <tr><td><code>collectAsState()</code></td><td><code>State&lt;T&gt;</code></td><td>Flow sang State (không theo vòng đời)</td></tr>
+        <tr><td><code>observeAsState()</code></td><td><code>State&lt;T?&gt;</code></td><td>LiveData sang State</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>Ví dụ 1: Đếm số ly nước đã uống</h4>
+    <pre><code class="language-kotlin">import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+
+@Composable
+fun WaterCounter(modifier: Modifier = Modifier) {
+    var glasses by remember { mutableIntStateOf(0) }
+
+    Column(
+        modifier = modifier.padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = "Hôm nay bạn đã uống $glasses ly nước",
+            style = MaterialTheme.typography.titleMedium
+        )
+        if (glasses &gt;= 8) {
+            Text("Đủ chỉ tiêu rồi, tuyệt vời!", color = MaterialTheme.colorScheme.primary)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { glasses++ }) { Text("Thêm 1 ly") }
+            OutlinedButton(onClick = { glasses = 0 }, enabled = glasses &gt; 0) {
+                Text("Đặt lại")
+            }
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun WaterCounterPreview() {
+    WaterCounter()
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Mỗi lần bấm "Thêm 1 ly", con số tăng ngay lập tức. Từ ly thứ 8 xuất hiện dòng chúc mừng màu chủ đạo. Nút "Đặt lại" bị mờ khi số ly bằng 0 và đưa mọi thứ về ban đầu khi bấm.</p>
+
+    <h4>Ví dụ 2: Giỏ hàng thêm và xóa món</h4>
+    <pre><code class="language-kotlin">data class MenuItem(val id: Int, val name: String, val price: Int)
+
+val sampleMenu = listOf(
+    MenuItem(1, "Cà phê sữa", 29_000),
+    MenuItem(2, "Trà đào", 35_000),
+    MenuItem(3, "Bánh mì trứng", 25_000)
+)
+
+@Composable
+fun CartScreen(menu: List&lt;MenuItem&gt; = sampleMenu) {
+    val cart = remember { mutableStateListOf&lt;MenuItem&gt;() }
+    val total = cart.sumOf { it.price }   // tính lại mỗi khi cart đổi
+
+    Column(Modifier.padding(16.dp)) {
+        Text("Thực đơn", style = MaterialTheme.typography.titleMedium)
+        menu.forEach { item -&gt;
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("${item.name} – ${item.price}đ", Modifier.weight(1f))
+                TextButton(onClick = { cart.add(item) }) { Text("Thêm") }
+            }
+        }
+
+        HorizontalDivider(Modifier.padding(vertical = 8.dp))
+
+        Text("Giỏ hàng (${cart.size} món)", style = MaterialTheme.typography.titleMedium)
+        cart.forEachIndexed { index, item -&gt;
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(item.name, Modifier.weight(1f))
+                TextButton(onClick = { cart.removeAt(index) }) { Text("Xóa") }
+            }
+        }
+        Text("Tổng: ${total}đ", style = MaterialTheme.typography.titleLarge)
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Bấm "Thêm" ở một món, món đó hiện ngay trong phần giỏ hàng, số món và tổng tiền cập nhật theo. Bấm "Xóa" ở một dòng trong giỏ, dòng đó biến mất và tổng tiền giảm tương ứng.</p>
+
+    <h4>Ví dụ 3: Lỗi kinh điển – dùng ArrayList thường</h4>
+    <pre><code class="language-kotlin">// SAI: bấm nút, danh sách đã có phần tử nhưng màn hình vẫn trống
+@Composable
+fun NotesWrong() {
+    val notes = remember { ArrayList&lt;String&gt;() }   // Compose không theo dõi ArrayList
+    Column {
+        Button(onClick = { notes.add("Ghi chú ${notes.size + 1}") }) { Text("Thêm ghi chú") }
+        notes.forEach { Text(it) }
+    }
+}
+
+// CŨNG SAI: add() sửa bên trong list nhưng không gán đối tượng mới cho state
+// var notes by remember { mutableStateOf(mutableListOf&lt;String&gt;()) }
+// notes.add("...")
+
+// ĐÚNG – cách 1: dùng danh sách quan sát được
+@Composable
+fun NotesFixed() {
+    val notes = remember { mutableStateListOf&lt;String&gt;() }
+    Column {
+        Button(onClick = { notes.add("Ghi chú ${notes.size + 1}") }) { Text("Thêm ghi chú") }
+        notes.forEach { Text(it) }
+    }
+}
+
+// ĐÚNG – cách 2: danh sách bất biến, mỗi lần thay bằng danh sách mới
+@Composable
+fun NotesImmutable() {
+    var notes by remember { mutableStateOf(listOf&lt;String&gt;()) }
+    Column {
+        Button(onClick = { notes = notes + "Ghi chú ${notes.size + 1}" }) { Text("Thêm ghi chú") }
+        notes.forEach { Text(it) }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Với <code>NotesWrong</code>, bấm bao nhiêu lần màn hình vẫn chỉ có nút (các ghi chú chỉ "bất ngờ" hiện ra nếu có lý do khác gây recomposition). Với hai bản sửa, mỗi lần bấm một dòng "Ghi chú N" mới xuất hiện ngay.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li><strong>Thiếu <code>remember</code>:</strong> viết <code>val count = mutableStateOf(0)</code> không có <code>remember</code> thì mỗi lần recomposition lại tạo state mới về 0. Android Studio thường gạch chân cảnh báo lỗi này.</li>
+      <li><strong><code>remember</code> không sống qua xoay màn hình.</strong> Lựa chọn tab, nội dung form... nên dùng <code>rememberSaveable</code> hoặc ViewModel (xem <a href="#luu-trang-thai">Lưu trạng thái</a>).</li>
+      <li><strong>Không ghi state trong thân composable</strong> (ngoài lambda sự kiện hoặc effect). Ví dụ đặt <code>count++</code> trực tiếp trong hàm sẽ gây vòng lặp recomposition vô tận.</li>
+      <li><strong>Ưu tiên dữ liệu bất biến:</strong> dùng <code>data class</code> với <code>val</code> và cập nhật bằng <code>copy(...)</code>. Sửa thuộc tính <code>var</code> bên trong một đối tượng thường không báo cho Compose biết.</li>
+      <li><strong>State là cục bộ theo từng lần gọi:</strong> gọi <code>WaterCounter()</code> hai lần sẽ có hai bộ đếm độc lập. Muốn nhiều composable dùng chung một state, hãy nâng state lên cha (xem <a href="#state-hoisting">State hoisting</a>).</li>
+      <li><strong>Đừng tính toán nặng trong thân hàm</strong> mà không bọc <code>remember(key)</code>: thân hàm có thể chạy rất nhiều lần.</li>
+    </ul>
+    <div class="callout tip"><strong>Mẹo:</strong> Nếu IDE không tự thêm import cho <code>by</code>, đặt con trỏ vào chỗ báo lỗi, nhấn <code>Alt+Enter</code> để IDE gợi ý import, hoặc thêm thủ công <code>androidx.compose.runtime.getValue</code> và <code>setValue</code>.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/state?hl=vi" target="_blank" rel="noopener">State and Jetpack Compose</a></p>
+</section>

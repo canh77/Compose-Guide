@@ -1,0 +1,196 @@
+<section class="topic" id="ham-composable" data-title="Hàm @Composable">
+  <h2>Hàm @Composable</h2>
+  <p class="lead">Mọi giao diện trong Compose được ghép từ các hàm gắn annotation <code>@Composable</code>. Hiểu các quy tắc và quy ước của chúng là nền móng để viết component dễ tái sử dụng, dễ xem trước và dễ kiểm thử.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p><strong>Hàm composable</strong> là một hàm Kotlin bình thường được gắn <code>@Composable</code>. Annotation này báo cho Compose Compiler biết hàm dùng để mô tả giao diện; trình biên dịch sẽ biến đổi hàm (thêm tham số ẩn, mã theo dõi state…) để runtime có thể gọi lại nó khi dữ liệu đổi.</p>
+    <p>Khác với View, hàm composable <strong>không trả về một đối tượng giao diện</strong>. Nó trả về <code>Unit</code> và trong lúc chạy sẽ "phát ra" (emit) các phần tử vào cây giao diện mà Compose quản lý. Bạn có thể coi mỗi hàm như một khối Lego: nhận dữ liệu qua tham số, gọi các khối nhỏ hơn bên trong, và ghép lại thành màn hình.</p>
+    <p>Nếu như với View bạn phải viết một lớp kế thừa <code>LinearLayout</code> để có một custom view, thì với Compose chỉ cần viết một hàm — rẻ hơn rất nhiều, nên hãy chia nhỏ giao diện thành nhiều hàm.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>Các quy tắc cơ bản</h4>
+    <div class="table-wrap"><table>
+      <thead>
+        <tr><th>Quy tắc</th><th>Giải thích</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Gắn <code>@Composable</code></td><td>Thiếu annotation thì không gọi được các composable khác bên trong.</td></tr>
+        <tr><td>Chỉ gọi từ composable khác</td><td>Gọi được trong thân một hàm <code>@Composable</code> hoặc trong lambda composable (như khối <code>setContent { }</code>, tham số <code>content</code>). Không gọi được trong <code>onClick</code> hay hàm thường.</td></tr>
+        <tr><td>Hàm vẽ giao diện đặt tên PascalCase, là danh từ</td><td><code>ProfileCard</code>, <code>NoteList</code> — không đặt <code>showProfile</code> hay <code>drawCard</code>.</td></tr>
+        <tr><td>Trả về <code>Unit</code></td><td>Hàm phát ra giao diện không trả giá trị; nó mô tả giao diện chứ không "tạo" View.</td></tr>
+        <tr><td>Nhận dữ liệu qua tham số</td><td>Mọi thứ hàm cần để hiển thị nên đến từ tham số (hoặc state nó tự quản lý), không đọc biến toàn cục có thể thay đổi.</td></tr>
+        <tr><td>Không có side effect</td><td>Không ghi file, gọi mạng, sửa biến bên ngoài trong thân hàm. Việc đó thuộc về <a href="#side-effects">side effect API</a> hoặc lambda sự kiện.</td></tr>
+        <tr><td>Có thể chạy nhiều lần</td><td>Compose có thể gọi lại hàm bất cứ lúc nào, rất thường xuyên. Hàm phải nhanh và cho cùng kết quả với cùng đầu vào. Xem <a href="#tu-duy-compose">Tư duy Compose</a>.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h4>Composable trả về giá trị</h4>
+    <p>Một số hàm <code>@Composable</code> không vẽ gì mà <em>trả về</em> một giá trị (thường cần đọc theme hoặc dùng <code>remember</code>). Những hàm này đặt tên camelCase như hàm Kotlin thường; nếu bên trong dùng <code>remember</code> để giữ một đối tượng thì đặt tiền tố <code>remember</code>, ví dụ <code>rememberScrollState()</code>, <code>rememberCoroutineScope()</code>.</p>
+    <pre><code class="language-kotlin">@Composable
+fun statusColor(isOnline: Boolean): Color =
+    if (isOnline) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline</code></pre>
+
+    <h4>Tham số <code>modifier</code></h4>
+    <p>Mọi composable phát ra giao diện nên nhận một tham số <code>modifier</code> để nơi gọi có thể chỉnh kích thước, khoảng cách, vị trí… mà không phải sửa bên trong. Quy ước:</p>
+    <ul>
+      <li>Tên là <code>modifier</code>, kiểu <code>Modifier</code>, giá trị mặc định là <code>Modifier</code> (rỗng).</li>
+      <li>Là <strong>tham số tùy chọn đầu tiên</strong>: đứng sau các tham số bắt buộc, trước các tham số tùy chọn khác.</li>
+      <li>Áp vào <strong>phần tử gốc</strong> (ngoài cùng) của composable, và chỉ áp <strong>một lần</strong>. Các modifier nội bộ nối tiếp phía sau: <code>modifier.fillMaxWidth().padding(16.dp)</code>.</li>
+    </ul>
+    <p>Thứ tự tham số khuyến nghị: tham số bắt buộc (dữ liệu, sự kiện) → <code>modifier</code> → tham số tùy chọn → lambda <code>content</code> ở cuối cùng (để dùng trailing lambda). Xem thêm <a href="#modifier">Modifier</a>.</p>
+
+    <h4>Slot API</h4>
+    <p><em>Slot</em> ("khe cắm") là tham số kiểu <code>@Composable () -&gt; Unit</code>, cho phép nơi gọi tự quyết định nội dung bên trong một vùng. <code>Button</code>, <code>Card</code>, <code>Scaffold</code> đều dùng slot: <code>Button</code> không ép bạn chỉ truyền chuỗi, mà nhận cả một khối giao diện (chữ, icon, hoặc cả hai). Slot có thể có receiver (<code>@Composable RowScope.() -&gt; Unit</code>) để nội dung dùng được modifier của layout bên trong, hoặc là nullable (<code>(@Composable () -&gt; Unit)?</code>) khi vùng đó có thể bỏ trống.</p>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>Ví dụ 1: Composable nhỏ có tham số</h4>
+    <pre><code class="language-kotlin">@Composable
+fun TagLabel(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = "#$text",
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+    )
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun TagLabelPreview() {
+    Row {
+        TagLabel("kotlin")
+        TagLabel("compose")
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Hai nhãn "#kotlin" và "#compose" màu chủ đạo của theme nằm cạnh nhau. Cùng một hàm, gọi hai lần với dữ liệu khác nhau.</p>
+
+    <h4>Ví dụ 2: Thẻ hồ sơ tái sử dụng</h4>
+    <pre><code class="language-kotlin">data class Contact(val name: String, val phone: String, val role: String)
+
+@Composable
+fun ProfileCard(
+    contact: Contact,
+    onCallClick: () -&gt; Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = contact.name.take(1),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(contact.name, style = MaterialTheme.typography.titleMedium)
+                Text(contact.role, style = MaterialTheme.typography.bodySmall)
+                Text(contact.phone, style = MaterialTheme.typography.bodyMedium)
+            }
+            TextButton(onClick = onCallClick) {
+                Text("Gọi")
+            }
+        }
+    }
+}
+
+@Composable
+fun TeamList(
+    contacts: List&lt;Contact&gt;,
+    onCall: (Contact) -&gt; Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        contacts.forEach { contact -&gt;
+            ProfileCard(contact = contact, onCallClick = { onCall(contact) })
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun TeamListPreview() {
+    MaterialTheme {
+        TeamList(
+            contacts = listOf(
+                Contact("An Nguyễn", "0901 234 567", "Thiết kế"),
+                Contact("Bình Trần", "0912 345 678", "Lập trình viên")
+            ),
+            onCall = {}
+        )
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Hai thẻ xếp dọc, mỗi thẻ có hình tròn chứa chữ cái đầu ("A", "B"), tên, chức vụ, số điện thoại và nút "Gọi" bên phải. <code>ProfileCard</code> không biết gì về việc gọi điện — nó chỉ báo sự kiện lên trên qua <code>onCallClick</code>.</p>
+
+    <h4>Ví dụ 3: Tự viết slot API</h4>
+    <pre><code class="language-kotlin">@Composable
+fun InfoSection(
+    title: String,
+    modifier: Modifier = Modifier,
+    action: (@Composable () -&gt; Unit)? = null,
+    content: @Composable ColumnScope.() -&gt; Unit
+) {
+    Column(modifier = modifier.fillMaxWidth().padding(16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.weight(1f)
+            )
+            action?.invoke()
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        content()
+    }
+}
+
+@Composable
+fun OrderSummary(modifier: Modifier = Modifier) {
+    InfoSection(
+        title = "Đơn hàng #1024",
+        modifier = modifier,
+        action = {
+            TextButton(onClick = { /* mở chi tiết đơn */ }) { Text("Xem") }
+        }
+    ) {
+        Text("2 x Cà phê sữa")
+        Text("1 x Bánh mì ốp la")
+        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+        Text("Tổng: 85.000đ", modifier = Modifier.align(Alignment.End))
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Tiêu đề "Đơn hàng #1024" với nút "Xem" ở bên phải, bên dưới là hai dòng món, một đường kẻ ngang và dòng tổng tiền căn phải. Vì <code>content</code> có receiver <code>ColumnScope</code> nên nơi gọi dùng được <code>Modifier.align(Alignment.End)</code>.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li>Lỗi "@Composable invocations can only happen from the context of a @Composable function" xuất hiện khi bạn gọi composable trong <code>onClick</code> hoặc hàm thường. Trong sự kiện, hãy <em>thay đổi state</em>; giao diện sẽ tự hiển thị theo state mới.</li>
+      <li>Không áp <code>modifier</code> nhận từ tham số cho nhiều phần tử con, cũng không áp vào phần tử con bên trong — chỉ phần tử gốc. Phần tử con dùng <code>Modifier</code> mới.</li>
+      <li>Đừng truyền <code>ViewModel</code> xuống các composable con; truyền dữ liệu và lambda sự kiện (đặt tên <code>onXxx</code>). Cách này giúp component dễ preview và tái sử dụng — xem <a href="#state-hoisting">State hoisting</a>.</li>
+      <li>Ưu tiên tham số kiểu bất biến (data class với <code>val</code>, <code>List</code> chỉ đọc) để Compose bỏ qua được việc vẽ lại khi dữ liệu không đổi — xem <a href="#performance">Hiệu năng</a>.</li>
+      <li>Đừng ngại tách nhỏ: hàm composable dài trên một màn hình nên được chia thành nhiều hàm con có tên rõ nghĩa.</li>
+    </ul>
+    <div class="callout tip"><strong>Mẹo:</strong> Gõ <code>comp</code> rồi nhấn Tab trong Android Studio để sinh nhanh khung hàm <code>@Composable</code> (live template có sẵn); gõ <code>prev</code> để sinh hàm preview.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/tutorial?hl=vi" target="_blank" rel="noopener">Hướng dẫn Jetpack Compose</a>, <a href="https://developer.android.com/develop/ui/compose/mental-model?hl=vi" target="_blank" rel="noopener">Tư duy trong Compose</a></p>
+</section>

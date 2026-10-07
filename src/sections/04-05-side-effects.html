@@ -1,0 +1,216 @@
+<section class="topic" id="side-effects" data-title="Side effects">
+  <h2>Side effect: LaunchedEffect và các hiệu ứng khác</h2>
+  <p class="lead">Side effect là những việc một composable làm "ra bên ngoài" giao diện như gọi mạng, hiện snackbar hay đăng ký listener. Compose có một bộ API riêng để những việc này chạy đúng lúc, đúng số lần và được dọn dẹp sạch sẽ.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p><strong>Side effect</strong> (hiệu ứng phụ) là mọi thay đổi xảy ra bên ngoài phạm vi của hàm composable: gửi request, ghi log analytics, hiện snackbar, bắt đầu đếm giờ, đăng ký một observer... Một hàm composable lý tưởng chỉ <em>mô tả</em> giao diện từ dữ liệu đầu vào, không tự ý "làm việc" khác.</p>
+    <p>Lý do: Compose có thể gọi lại (recompose) một composable rất nhiều lần, có khi mỗi khung hình khi đang chạy animation; lần chạy có thể bị bỏ qua hoặc bị hủy giữa chừng. Nếu bạn viết <code>api.loadNotes()</code> ngay trong thân hàm, request sẽ bị gửi lại sau mỗi lần recompose. Trong hệ View cũ, bạn đặt những việc này trong <code>onCreate</code>, <code>onResume</code> hoặc listener; trong Compose, bạn dùng các <strong>effect API</strong> để gắn công việc vào vòng đời của composable trong composition (xem <a href="#vong-doi-giai-doan">Vòng đời &amp; giai đoạn</a>).</p>
+    <p>Mỗi effect API phục vụ một nhu cầu: chạy coroutine khi composable xuất hiện (<code>LaunchedEffect</code>), chạy coroutine khi người dùng bấm (<code>rememberCoroutineScope</code>), đăng ký rồi hủy đăng ký (<code>DisposableEffect</code>), đồng bộ dữ liệu ra ngoài (<code>SideEffect</code>), cùng vài công cụ chuyển đổi giữa <code>State</code> và <code>Flow</code>.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>LaunchedEffect: chạy hàm suspend gắn với composable</h4>
+    <p><code>LaunchedEffect(key) { … }</code> khởi chạy một coroutine khi composable <strong>vào composition</strong>. Khi <code>key</code> đổi giá trị, coroutine cũ bị hủy và khối lệnh chạy lại với giá trị mới. Khi composable <strong>rời composition</strong>, coroutine bị hủy. Dùng <code>LaunchedEffect(Unit)</code> nếu chỉ muốn chạy một lần khi vào composition.</p>
+    <pre><code class="language-kotlin">@Composable
+fun NoteDetail(noteId: String, repository: NotesRepository) {
+    var note by remember { mutableStateOf&lt;Note?&gt;(null) }
+
+    LaunchedEffect(noteId) {
+        note = repository.load(noteId) // hàm suspend, chạy lại khi noteId đổi
+    }
+
+    Text(note?.title ?: "Đang tải...")
+}</code></pre>
+
+    <h4>rememberCoroutineScope: coroutine cho sự kiện người dùng</h4>
+    <p><code>LaunchedEffect</code> là composable nên không gọi được trong <code>onClick</code>. Với sự kiện người dùng, lấy một <code>CoroutineScope</code> bằng <code>rememberCoroutineScope()</code>; scope này tự hủy khi composable rời composition.</p>
+    <pre><code class="language-kotlin">@Composable
+fun ContactList(contacts: List&lt;String&gt;) {
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+
+    Column {
+        Button(onClick = { scope.launch { listState.animateScrollToItem(0) } }) {
+            Text("Lên đầu danh sách")
+        }
+        LazyColumn(state = listState) {
+            items(contacts) { Text(it, Modifier.padding(12.dp)) }
+        }
+    }
+}</code></pre>
+
+    <h4>DisposableEffect, SideEffect và rememberUpdatedState</h4>
+    <ul>
+      <li><code>DisposableEffect(key) { …; onDispose { … } }</code>: dùng khi cần <em>đăng ký</em> rồi <em>hủy đăng ký</em> (listener, callback, observer). Khối <code>onDispose</code> chạy khi key đổi hoặc khi composable rời composition. Bắt buộc phải có <code>onDispose</code> ở cuối.</li>
+      <li><code>SideEffect { … }</code>: chạy sau <strong>mỗi lần recompose thành công</strong>, dùng để đẩy giá trị từ Compose sang một đối tượng không thuộc Compose (SDK analytics, đối tượng View cũ).</li>
+      <li><code>rememberUpdatedState(value)</code>: trả về một <code>State</code> luôn chứa giá trị mới nhất. Dùng trong effect chạy lâu mà không muốn khởi động lại khi lambda/tham số đổi.</li>
+    </ul>
+    <pre><code class="language-kotlin">@Composable
+fun ShopScreen(membership: String, analytics: Analytics) {
+    SideEffect {
+        analytics.setUserProperty("membership", membership)
+    }
+    // ... giao diện cửa hàng
+}</code></pre>
+
+    <h4>produceState, derivedStateOf, snapshotFlow</h4>
+    <p><code>produceState</code> biến một nguồn dữ liệu bất đồng bộ thành <code>State</code>. Bên trong khối lệnh bạn gán <code>value</code>; khối này chạy trong coroutine và chạy lại khi key đổi.</p>
+    <pre><code class="language-kotlin">@Composable
+fun rememberForecast(city: String, repository: WeatherRepository): State&lt;ForecastUi&gt; =
+    produceState&lt;ForecastUi&gt;(initialValue = ForecastUi.Loading, city) {
+        value = try {
+            ForecastUi.Ready(repository.forecast(city))
+        } catch (e: IOException) {
+            ForecastUi.Failed("Không có kết nối mạng")
+        }
+    }</code></pre>
+    <p><code>derivedStateOf</code> tạo state <em>tính từ</em> state khác. Nó hữu ích khi nguồn đổi rất thường xuyên nhưng kết quả ít đổi, giúp giảm số lần recompose. Luôn bọc trong <code>remember</code>.</p>
+    <pre><code class="language-kotlin">val listState = rememberLazyListState()
+// firstVisibleItemIndex đổi liên tục khi cuộn, nhưng Boolean chỉ đổi khi vượt ngưỡng
+val showScrollToTop by remember {
+    derivedStateOf { listState.firstVisibleItemIndex &gt; 0 }
+}</code></pre>
+    <p><code>snapshotFlow { … }</code> làm điều ngược lại: biến việc đọc <code>State</code> thành một <code>Flow</code>, phát giá trị mới mỗi khi kết quả thay đổi, để bạn dùng các toán tử như <code>map</code>, <code>filter</code>, <code>debounce</code>.</p>
+    <pre><code class="language-kotlin">LaunchedEffect(listState) {
+    snapshotFlow { listState.firstVisibleItemIndex }
+        .map { index -&gt; index &gt; 20 }
+        .distinctUntilChanged()
+        .filter { scrolledDeep -&gt; scrolledDeep }
+        .collect { analytics.log("contacts_scrolled_deep") }
+}</code></pre>
+
+    <h4>LifecycleResumeEffect và LifecycleStartEffect</h4>
+    <p>Thư viện <code>androidx.lifecycle:lifecycle-runtime-compose:2.11.0</code> có hai effect gắn với vòng đời màn hình: khối chính chạy khi đạt <code>ON_RESUME</code> (hoặc <code>ON_START</code>), khối dọn dẹp chạy khi <code>ON_PAUSE</code> (hoặc <code>ON_STOP</code>) hay khi rời composition.</p>
+    <pre><code class="language-kotlin">LifecycleResumeEffect(player) {
+    player.play()
+    onPauseOrDispose { player.pause() }
+}
+
+LifecycleStartEffect(locationClient) {
+    locationClient.startUpdates()
+    onStopOrDispose { locationClient.stopUpdates() }
+}</code></pre>
+
+    <h4>Chọn API theo tình huống</h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Tình huống</th><th>API nên dùng</th></tr></thead>
+      <tbody>
+        <tr><td>Tải dữ liệu khi màn hình xuất hiện hoặc khi một id thay đổi</td><td><code>LaunchedEffect(id)</code></td></tr>
+        <tr><td>Chạy coroutine khi người dùng bấm (cuộn danh sách, hiện snackbar)</td><td><code>rememberCoroutineScope()</code></td></tr>
+        <tr><td>Đăng ký listener/observer và phải hủy khi rời màn hình</td><td><code>DisposableEffect(key)</code></td></tr>
+        <tr><td>Đẩy giá trị Compose ra đối tượng ngoài sau mỗi lần recompose</td><td><code>SideEffect</code></td></tr>
+        <tr><td>Effect chạy lâu nhưng phải gọi lambda mới nhất</td><td><code>rememberUpdatedState</code></td></tr>
+        <tr><td>Biến hàm suspend/callback thành <code>State</code> để hiển thị</td><td><code>produceState</code></td></tr>
+        <tr><td>Giá trị tính từ state khác và đổi ít hơn nguồn</td><td><code>derivedStateOf</code></td></tr>
+        <tr><td>Phản ứng với thay đổi của <code>State</code> bằng toán tử Flow</td><td><code>snapshotFlow</code></td></tr>
+        <tr><td>Làm việc theo ON_RESUME/ON_PAUSE hoặc ON_START/ON_STOP</td><td><code>LifecycleResumeEffect</code> / <code>LifecycleStartEffect</code></td></tr>
+        <tr><td>Thu <code>Flow</code> từ ViewModel để hiển thị</td><td><code>collectAsStateWithLifecycle()</code> (xem <a href="#viewmodel">ViewModel</a>)</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>1. Hiện snackbar khi có lỗi</h4>
+    <p class="code-caption">Màn hình ghi chú nhận <code>errorMessage</code> từ ViewModel; mỗi lỗi mới hiện một snackbar.</p>
+    <pre><code class="language-kotlin">@Composable
+fun NotesScreen(
+    notes: List&lt;String&gt;,
+    errorMessage: String?,
+    onRetry: () -&gt; Unit,
+    onErrorShown: () -&gt; Unit
+) {
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(errorMessage) {
+        if (errorMessage != null) {
+            val result = snackbarHostState.showSnackbar(
+                message = errorMessage,
+                actionLabel = "Thử lại"
+            )
+            if (result == SnackbarResult.ActionPerformed) onRetry()
+            onErrorShown() // báo ViewModel xóa lỗi, để lỗi giống hệt lần sau vẫn hiện được
+        }
+    }
+
+    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { innerPadding -&gt;
+        LazyColumn(contentPadding = innerPadding) {
+            items(notes) { note -&gt; Text(note, Modifier.padding(16.dp)) }
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Khi <code>errorMessage</code> chuyển từ <code>null</code> sang một chuỗi, snackbar "Thử lại" hiện ở đáy màn hình. Recompose vì lý do khác (danh sách đổi) không làm snackbar hiện lại, vì key không đổi.</p>
+
+    <h4>2. Splash đếm ngược với rememberUpdatedState</h4>
+    <pre><code class="language-kotlin">@Composable
+fun SplashScreen(onTimeout: () -&gt; Unit) {
+    // Luôn trỏ tới lambda mới nhất mà không khởi động lại bộ đếm
+    val currentOnTimeout by rememberUpdatedState(onTimeout)
+    var secondsLeft by remember { mutableIntStateOf(3) }
+
+    LaunchedEffect(Unit) {
+        while (secondsLeft &gt; 0) {
+            delay(1_000)
+            secondsLeft--
+        }
+        currentOnTimeout()
+    }
+
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text(
+            text = "Vào ứng dụng sau $secondsLeft giây",
+            style = MaterialTheme.typography.titleMedium
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun SplashScreenPreview() {
+    SplashScreen(onTimeout = {})
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Màn hình hiện "Vào ứng dụng sau 3 giây", rồi 2, 1, sau đó gọi <code>onTimeout</code>. Nếu màn hình cha truyền lambda khác giữa chừng, bộ đếm không bị đặt lại về 3 nhưng lambda mới nhất vẫn được gọi.</p>
+
+    <h4>3. Làm mới dữ liệu mỗi khi màn hình ON_RESUME</h4>
+    <p class="code-caption"><code>LocalLifecycleOwner</code> được import từ <code>androidx.lifecycle.compose.LocalLifecycleOwner</code>.</p>
+    <pre><code class="language-kotlin">@Composable
+fun OnResumeEffect(onResume: () -&gt; Unit) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val currentOnResume by rememberUpdatedState(onResume)
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event -&gt;
+            if (event == Lifecycle.Event.ON_RESUME) currentOnResume()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+}
+
+@Composable
+fun WeatherScreen(temperature: String, onRefresh: () -&gt; Unit) {
+    OnResumeEffect(onResume = onRefresh)
+    Text("Nhiệt độ hiện tại: $temperature", Modifier.padding(16.dp))
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Mỗi lần người dùng quay lại ứng dụng (từ màn hình chính hoặc ứng dụng khác), <code>onRefresh</code> được gọi để tải nhiệt độ mới. Lần đầu vào màn hình cũng nhận <code>ON_RESUME</code>, vì Lifecycle phát lại các sự kiện cho observer mới đăng ký. Khi màn hình bị gỡ khỏi composition, observer được hủy đăng ký.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li><strong>Chọn key đúng.</strong> Mọi giá trị có thể thay đổi mà effect sử dụng phải hoặc là key, hoặc được bọc bằng <code>rememberUpdatedState</code>. Dùng <code>LaunchedEffect(Unit)</code> trong khi khối lệnh đọc <code>userId</code> sẽ khiến dữ liệu cũ không được tải lại khi <code>userId</code> đổi.</li>
+      <li>Ngược lại, key là đối tượng mới tạo ở mỗi lần recompose (lambda không ổn định, <code>listOf(...)</code>, <code>Random</code>) khiến effect bị hủy và chạy lại liên tục.</li>
+      <li>Không gọi <code>scope.launch { … }</code> hoặc gọi API ngay trong thân composable. Chỉ <code>launch</code> trong callback như <code>onClick</code>; việc cần chạy khi xuất hiện thì dùng <code>LaunchedEffect</code>.</li>
+      <li>Coroutine của <code>LaunchedEffect</code> và <code>rememberCoroutineScope</code> bị hủy khi composable rời màn hình. Việc bắt buộc phải xong (lưu ghi chú, đồng bộ) nên đặt trong <code>viewModelScope</code> hoặc WorkManager.</li>
+      <li><code>derivedStateOf</code> chỉ có lợi khi kết quả đổi <em>ít hơn</em> nguồn. Với <code>val fullName = "$first $last"</code> thì dùng biến thường là đủ.</li>
+      <li><code>DisposableEffect</code> không có <code>onDispose</code> sẽ không biên dịch được. Hãy dọn dẹp đủ mọi thứ đã đăng ký để tránh rò rỉ bộ nhớ.</li>
+    </ul>
+    <div class="callout tip"><strong>Mẹo:</strong> Logic nghiệp vụ (gọi API, xử lý lỗi) nên nằm trong ViewModel. Effect trong composable chỉ là "chất keo" nối UI với ViewModel và với các API phụ thuộc vòng đời.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/side-effects" target="_blank" rel="noopener">Side-effects in Compose</a></p>
+</section>

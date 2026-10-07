@@ -1,0 +1,254 @@
+<section class="topic" id="gestures" data-title="Cử chỉ &amp; cuộn">
+  <h2>Cử chỉ chạm và cuộn</h2>
+  <p class="lead">Chạm, nhấn giữ, nhấn đúp, kéo, chụm hai ngón, cuộn — đó là cách người dùng "nói chuyện" với ứng dụng. Compose cung cấp các modifier từ đơn giản đến cấp thấp để bạn bắt được mọi cử chỉ này mà không cần viết lớp xử lý sự kiện riêng.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p><strong>Cử chỉ</strong> (gesture) là một chuỗi sự kiện con trỏ (pointer — ngón tay, chuột hoặc bút) được diễn giải thành một ý định: chạm nhanh là "chọn", giữ lâu là "mở menu", di chuyển là "kéo", hai ngón tách ra là "phóng to". Trong hệ View cũ, bạn phải ghi đè <code>onTouchEvent</code>, dùng <code>GestureDetector</code>, <code>ScaleGestureDetector</code> hoặc bọc nội dung trong <code>ScrollView</code>. Trong Compose, mọi thứ là <strong>modifier</strong> gắn vào phần tử cần nhận cử chỉ.</p>
+    <p>Các API được xếp theo tầng: tầng càng cao càng ít code và tự lo luôn phản hồi thị giác, hỗ trợ tiếp cận; tầng càng thấp càng linh hoạt nhưng bạn phải tự làm nhiều hơn. Nguyên tắc: <strong>luôn bắt đầu từ tầng cao nhất đáp ứng được nhu cầu</strong>.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Tầng</th><th>API</th><th>Khi nào dùng</th></tr></thead>
+      <tbody>
+        <tr><td>1. Component có sẵn</td><td><code>Button</code>, <code>Slider</code>, <code>Switch</code>, <code>LazyColumn</code>, <code>HorizontalPager</code>, <code>SwipeToDismissBox</code></td><td>Khi đã có component làm đúng việc: đủ hiệu ứng, semantics, kiểm thử sẵn.</td></tr>
+        <tr><td>2. Modifier cấp cao</td><td><code>clickable</code>, <code>combinedClickable</code>, <code>toggleable</code>, <code>draggable</code>, <code>scrollable</code>, <code>verticalScroll</code>, <code>transformable</code></td><td>Biến một phần tử bất kỳ thành thứ chạm/kéo/cuộn/phóng to được.</td></tr>
+        <tr><td>3. Bộ nhận diện trong <code>pointerInput</code></td><td><code>detectTapGestures</code>, <code>detectDragGestures</code>, <code>detectTransformGestures</code></td><td>Cần vị trí chạm, nhấn đúp, kéo tự do hai chiều.</td></tr>
+        <tr><td>4. Cấp thấp nhất</td><td><code>awaitEachGesture</code>, <code>awaitPointerEvent</code> trong <code>pointerInput</code></td><td>Tự định nghĩa một cử chỉ hoàn toàn mới (hiếm khi cần).</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>Chạm: <code>clickable</code> và <code>combinedClickable</code></h4>
+    <p><code>Modifier.clickable(onClick = { … })</code> biến phần tử thành vùng bấm được. Khi nằm trong <code>MaterialTheme</code>, nó tự hiện <strong>hiệu ứng gợn</strong> (ripple — vòng sóng lan ra từ chỗ chạm), tự gộp nội dung con cho TalkBack và hỗ trợ bàn phím. Có thể truyền <code>onClickLabel</code> (mô tả hành động cho trình đọc màn hình) và <code>role</code>. Muốn thêm nhấn giữ hoặc nhấn đúp, dùng <code>combinedClickable</code>:</p>
+    <pre><code class="language-kotlin">Text(
+    text = "Ghi chú: Mua sữa",
+    modifier = Modifier
+        .combinedClickable(
+            onClick = { moGhiChu() },
+            onLongClick = { hienMenuXoa() },
+            onDoubleClick = { danhDauQuanTrong() }
+        )
+        .padding(16.dp)
+)</code></pre>
+    <p>Ở các phiên bản Compose cũ, <code>combinedClickable</code> cần <code>@OptIn(ExperimentalFoundationApi::class)</code>. Thứ tự modifier quan trọng: đặt <code>clickable</code> <em>trước</em> <code>padding</code> để cả phần đệm cũng bấm được.</p>
+
+    <h4>Nhận diện chạm chi tiết: <code>pointerInput</code> + <code>detectTapGestures</code></h4>
+    <p>Khi cần tọa độ chỗ chạm hoặc muốn tự xử lý mà không có ripple, dùng <code>Modifier.pointerInput(key) { detectTapGestures(onTap = …, onDoubleTap = …, onLongPress = …, onPress = …) }</code>. Mỗi callback nhận một <code>Offset</code> là vị trí chạm (px, tính từ góc trên trái phần tử). Tham số <code>key</code> quyết định khi nào khối xử lý bị khởi động lại — xem phần Chú ý.</p>
+
+    <h4>Kéo: <code>detectDragGestures</code> và <code>draggable</code></h4>
+    <ul>
+      <li><strong>Kéo tự do hai chiều</strong>: trong <code>pointerInput</code>, gọi <code>detectDragGestures { change, dragAmount -&gt; … }</code>, cộng <code>dragAmount</code> vào một state <code>Offset</code> rồi dịch phần tử bằng <code>Modifier.offset { IntOffset(…) }</code>.</li>
+      <li><strong>Kéo một chiều</strong>: <code>Modifier.draggable(state = rememberDraggableState { delta -&gt; … }, orientation = Orientation.Horizontal)</code>. Có thêm <code>onDragStarted</code>, <code>onDragStopped</code> (nhận vận tốc lúc buông tay).</li>
+    </ul>
+    <pre><code class="language-kotlin">var dichX by remember { mutableFloatStateOf(0f) }
+Box(
+    Modifier
+        .offset { IntOffset(dichX.roundToInt(), 0) }
+        .size(56.dp)
+        .background(Color(0xFF26A69A), CircleShape)
+        .draggable(
+            orientation = Orientation.Horizontal,
+            state = rememberDraggableState { delta -&gt; dichX += delta }
+        )
+)</code></pre>
+    <p>Lưu ý <code>draggable</code> chỉ <em>báo</em> khoảng kéo; việc di chuyển phần tử là do bạn cập nhật state. Muốn thả ra có hiệu ứng bật về, kết hợp với <code>Animatable</code> (xem <a href="#animation-nang-cao">Animation nâng cao</a>).</p>
+
+    <h4>Phóng to, xoay, di chuyển: <code>transformable</code></h4>
+    <p><code>Modifier.transformable(state = rememberTransformableState { zoomChange, panChange, rotationChange -&gt; … })</code> nhận cử chỉ nhiều ngón: tỉ lệ phóng (nhân dồn), độ dịch (<code>Offset</code>) và góc xoay (độ). Áp các giá trị vào <code>graphicsLayer</code> để hiển thị. Nếu cần tâm của cử chỉ, dùng bản cấp thấp <code>detectTransformGestures { centroid, pan, zoom, rotation -&gt; … }</code> trong <code>pointerInput</code>.</p>
+
+    <h4>Cuộn nội dung</h4>
+    <ul>
+      <li><code>Column(Modifier.verticalScroll(rememberScrollState()))</code> cuộn dọc; <code>Row(Modifier.horizontalScroll(…))</code> cuộn ngang. Hợp với nội dung ngắn, số phần tử biết trước; danh sách dài thì dùng <a href="#lazy-list">LazyColumn</a>.</li>
+      <li><code>ScrollState</code> cho biết vị trí hiện tại (<code>value</code>, <code>maxValue</code>) và cuộn bằng code: <code>scrollTo(px)</code> (nhảy ngay) hoặc <code>animateScrollTo(px)</code> (cuộn mượt) — cả hai là hàm <code>suspend</code>, gọi trong coroutine.</li>
+      <li><code>Modifier.scrollable</code> là bản cấp thấp: chỉ báo khoảng cuộn (kể cả quán tính khi hất tay) mà không tự dịch nội dung.</li>
+    </ul>
+    <pre><code class="language-kotlin">@Composable
+fun DieuKhoanSuDung() {
+    val trangThaiCuon = rememberScrollState()
+    val scope = rememberCoroutineScope()
+    Column(Modifier.fillMaxSize()) {
+        Column(
+            Modifier
+                .weight(1f)
+                .verticalScroll(trangThaiCuon)
+                .padding(16.dp)
+        ) {
+            repeat(40) { Text("Điều khoản số ${it + 1}: nội dung mẫu…") }
+        }
+        Button(
+            onClick = { scope.launch { trangThaiCuon.animateScrollTo(0) } },
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text("Về đầu trang")
+        }
+    }
+}</code></pre>
+
+    <h4>Cuộn lồng nhau (nested scroll)</h4>
+    <p>Khi một vùng cuộn nằm trong vùng cuộn khác hoặc cạnh thành phần phản ứng theo cuộn, Compose chuyển khoảng cuộn qua một chuỗi "cha – con": con cuộn trước, phần thừa đẩy lên cha (hoặc ngược lại). Ví dụ phổ biến nhất là thanh tiêu đề thu gọn khi cuộn danh sách: nối <code>scrollBehavior.nestedScrollConnection</code> vào <code>Modifier.nestedScroll</code> của <code>Scaffold</code>.</p>
+    <pre><code class="language-kotlin">@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HopThu() {
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            LargeTopAppBar(title = { Text("Hộp thư") }, scrollBehavior = scrollBehavior)
+        }
+    ) { innerPadding -&gt;
+        LazyColumn(contentPadding = innerPadding) {
+            items(50) { Text("Thư số ${it + 1}", Modifier.padding(16.dp)) }
+        }
+    }
+}</code></pre>
+
+    <h4>Vuốt để xóa</h4>
+    <p>Material 3 có sẵn <code>SwipeToDismissBox</code> cho cử chỉ vuốt ngang một hàng để xóa/lưu trữ. Bạn tạo trạng thái bằng <code>rememberSwipeToDismissBoxState()</code>, truyền nội dung chính (hàng danh sách) và nội dung nền hiện ra phía sau khi vuốt (thường là màu đỏ và biểu tượng thùng rác). Trạng thái cho biết hàng đang ở <code>SwipeToDismissBoxValue.Settled</code>, <code>StartToEnd</code> hay <code>EndToStart</code> để bạn xử lý xóa. Tham số chi tiết thay đổi giữa các phiên bản Material 3 — hãy tra trang tài liệu của <code>SwipeToDismissBox</code> trước khi dùng.</p>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>Ví dụ 1: Ảnh nhấn đúp để thích</h4>
+    <pre><code class="language-kotlin">@Composable
+fun BaiDangNhanDup() {
+    var daThich by remember { mutableStateOf(false) }
+    var hienTimLon by remember { mutableStateOf(false) }
+
+    LaunchedEffect(hienTimLon) {
+        if (hienTimLon) {
+            delay(700)
+            hienTimLon = false
+        }
+    }
+
+    Column {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .background(Color(0xFF81D4FA))
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onDoubleTap = {
+                            daThich = true
+                            hienTimLon = true
+                        }
+                    )
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Text("Ảnh bài đăng", color = Color.White)
+            AnimatedVisibility(visible = hienTimLon, enter = scaleIn() + fadeIn(), exit = fadeOut()) {
+                // ic_favorite_filled / ic_favorite: Material Symbols XML tải từ Google Fonts (tên giả định)
+                Icon(
+                    painterResource(R.drawable.ic_favorite_filled),
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(96.dp)
+                )
+            }
+        }
+        // Nút thường vẫn cần có: người dùng TalkBack không thực hiện được "nhấn đúp lên ảnh"
+        IconButton(onClick = { daThich = !daThich }) {
+            Icon(
+                painter = painterResource(if (daThich) R.drawable.ic_favorite_filled else R.drawable.ic_favorite),
+                contentDescription = if (daThich) "Bỏ thích" else "Thích",
+                tint = if (daThich) Color(0xFFE53935) else LocalContentColor.current
+            )
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Nhấn đúp vào khung ảnh xanh: một trái tim trắng lớn phóng ra giữa ảnh rồi mờ đi sau khoảng 0,7 giây, đồng thời nút trái tim bên dưới chuyển sang màu đỏ. Chạm vào nút để bật/tắt thích như bình thường.</p>
+
+    <h4>Ví dụ 2: Hình tròn kéo thả tự do</h4>
+    <pre><code class="language-kotlin">@Composable
+fun HinhTronKeoTha() {
+    var viTri by remember { mutableStateOf(Offset.Zero) }
+
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(320.dp)
+            .clipToBounds()
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Box(
+            Modifier
+                .offset { IntOffset(viTri.x.roundToInt(), viTri.y.roundToInt()) }
+                .size(64.dp)
+                .background(MaterialTheme.colorScheme.primary, CircleShape)
+                .pointerInput(Unit) {
+                    detectDragGestures { change, luongKeo -&gt;
+                        change.consume()      // báo rằng sự kiện đã được xử lý
+                        viTri += luongKeo
+                    }
+                }
+        )
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Một hình tròn màu chủ đạo ở góc trên trái vùng xám. Đặt ngón tay lên và kéo, hình tròn đi theo mọi hướng; kéo ra ngoài vùng xám thì phần vượt ra bị cắt khuất.</p>
+
+    <h4>Ví dụ 3: Ảnh phóng to, xoay bằng hai ngón, nhấn đúp để đặt lại</h4>
+    <p class="code-caption">Thay <code>R.drawable.phong_canh</code> bằng một ảnh có trong thư mục <code>res/drawable</code> của bạn.</p>
+    <pre><code class="language-kotlin">@Composable
+fun AnhPhongTo() {
+    var tiLe by remember { mutableFloatStateOf(1f) }
+    var gocXoay by remember { mutableFloatStateOf(0f) }
+    var dich by remember { mutableStateOf(Offset.Zero) }
+
+    val trangThai = rememberTransformableState { thayDoiTiLe, thayDoiViTri, thayDoiGoc -&gt;
+        tiLe = (tiLe * thayDoiTiLe).coerceIn(1f, 5f)
+        gocXoay += thayDoiGoc
+        dich += thayDoiViTri
+    }
+
+    // Gắn cử chỉ vào khung đứng yên, chỉ biến đổi ảnh bên trong
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .aspectRatio(4f / 3f)
+            .clipToBounds()
+            .pointerInput(Unit) {
+                detectTapGestures(onDoubleTap = {
+                    tiLe = 1f
+                    gocXoay = 0f
+                    dich = Offset.Zero
+                })
+            }
+            .transformable(state = trangThai)
+    ) {
+        Image(
+            painter = painterResource(R.drawable.phong_canh),
+            contentDescription = "Ảnh phong cảnh hồ trên núi",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    scaleX = tiLe
+                    scaleY = tiLe
+                    rotationZ = gocXoay
+                    translationX = dich.x
+                    translationY = dich.y
+                }
+        )
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Đặt hai ngón lên ảnh rồi tách ra để phóng to (tối đa 5 lần), xoay hai ngón để xoay ảnh, di chuyển để dời ảnh. Nhấn đúp bất kỳ lúc nào, ảnh trở về kích thước và vị trí ban đầu.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li><strong>Key của <code>pointerInput</code>.</strong> Khối lệnh bên trong chỉ khởi động lại khi key đổi. Nếu nó dùng một tham số từ bên ngoài (ví dụ lambda <code>onThich</code> hay biến <code>choPhepKeo</code>), hãy đưa tham số đó vào key, hoặc bọc bằng <code>rememberUpdatedState</code>; nếu không, khối sẽ giữ giá trị cũ mãi. Ghi/đọc state <code>by remember</code> như trong các ví dụ thì an toàn với <code>Unit</code>.</li>
+      <li><strong>Không lồng hai vùng cuộn cùng chiều.</strong> Đặt <code>LazyColumn</code> bên trong <code>Column(Modifier.verticalScroll(…))</code> sẽ gây lỗi đo chiều cao vô hạn. Hãy gộp tất cả vào một <code>LazyColumn</code> (dùng nhiều <code>item { }</code>) hoặc cho danh sách bên trong chiều cao cố định.</li>
+      <li><strong>Gọi <code>change.consume()</code> khi đã xử lý kéo</strong> để phần tử cha (ví dụ vùng cuộn) không xử lý thêm lần nữa.</li>
+      <li><strong>Dùng <code>offset { }</code> dạng lambda</strong> cho vị trí thay đổi liên tục: giá trị được đọc ở giai đoạn bố cục nên không gây recompose mỗi khung hình.</li>
+      <li><strong>Cử chỉ tùy chỉnh không tự có semantics.</strong> <code>pointerInput</code> không báo gì cho TalkBack; luôn cung cấp cách thay thế bằng nút hoặc <code>customActions</code> (xem <a href="#accessibility">Hỗ trợ tiếp cận</a>).</li>
+      <li><strong>Cẩn thận khi đặt <code>transformable</code>/kéo ngang bên trong <code>HorizontalPager</code></strong> hoặc vùng cuộn ngang: hai bên tranh nhau cùng một cử chỉ, gây cảm giác "kẹt".</li>
+    </ul>
+    <div class="callout warn"><strong>Cảnh báo:</strong> Bỏ ripple bằng <code>clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { … }</code> chỉ nên làm khi bạn có phản hồi thị giác khác. Phần tử bấm được mà không phản hồi gì khiến người dùng không biết thao tác đã có tác dụng.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/touch-input/pointer-input?hl=vi" target="_blank" rel="noopener">Nhập liệu bằng con trỏ trong Compose</a></p>
+</section>

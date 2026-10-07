@@ -1,0 +1,294 @@
+<section class="topic" id="lazy-list" data-title="LazyColumn &amp; LazyRow">
+  <h2>Danh sách: LazyColumn và LazyRow</h2>
+  <p class="lead"><code>LazyColumn</code> và <code>LazyRow</code> hiển thị danh sách dài (hàng trăm, hàng nghìn mục) mà vẫn mượt, vì chỉ tạo những mục đang nhìn thấy. Đây là phiên bản Compose của <code>RecyclerView</code>, nhưng gọn hơn rất nhiều.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p>Một <code>Column</code> kèm <code>Modifier.verticalScroll</code> vẫn cuộn được, nhưng nó tạo và đo <em>tất cả</em> phần tử con ngay từ đầu, kể cả những phần tử còn nằm rất xa ngoài màn hình. Với 20 mục thì không sao; với 2.000 mục thì app sẽ chậm và tốn bộ nhớ.</p>
+    <p>Các <strong>lazy layout</strong> (layout "lười") giải quyết vấn đề này: <code>LazyColumn</code> (cuộn dọc) và <code>LazyRow</code> (cuộn ngang) chỉ tạo các mục đang hiển thị cùng một ít mục sắp xuất hiện. Khi bạn cuộn, mục ra khỏi màn hình được giải phóng hoặc tái sử dụng cho mục mới.</p>
+    <p>So với <code>RecyclerView</code>, bạn không cần <code>Adapter</code>, <code>ViewHolder</code>, <code>LayoutManager</code> hay file XML cho từng dòng. Bạn chỉ <em>mô tả</em> nội dung bằng một DSL (ngôn ngữ nhỏ trong Kotlin) gồm các hàm <code>item</code>, <code>items</code>… và Compose lo phần còn lại. Khi dữ liệu đổi, danh sách tự cập nhật, không cần <code>notifyDataSetChanged</code>.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>Các hàm DSL trong LazyListScope</h4>
+    <p>Bên trong lambda của <code>LazyColumn { }</code> không phải là composable thông thường mà là <code>LazyListScope</code>: bạn gọi các hàm sau để khai báo mục, còn giao diện của từng mục nằm trong lambda của chúng.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Hàm</th><th>Dùng khi</th></tr></thead>
+      <tbody>
+        <tr><td><code>item { }</code></td><td>Thêm một mục lẻ: tiêu đề, banner, chân trang.</td></tr>
+        <tr><td><code>items(count) { index -&gt; }</code></td><td>Thêm <code>count</code> mục, chỉ biết vị trí.</td></tr>
+        <tr><td><code>items(list) { element -&gt; }</code></td><td>Thêm một mục cho mỗi phần tử của danh sách. Đây là cách dùng phổ biến nhất.</td></tr>
+        <tr><td><code>itemsIndexed(list) { index, element -&gt; }</code></td><td>Như trên nhưng cần cả vị trí, ví dụ đánh số thứ tự hay tô màu xen kẽ.</td></tr>
+        <tr><td><code>stickyHeader { }</code></td><td>Tiêu đề nhóm "dính" ở đầu màn hình khi cuộn qua nhóm đó.</td></tr>
+      </tbody>
+    </table></div>
+    <pre><code class="language-kotlin">LazyColumn {
+    item { Text("Bảng xếp hạng") }
+    itemsIndexed(players) { index, player -&gt;
+        Text("${index + 1}. ${player.name} – ${player.score} điểm")
+    }
+    item { Text("Hết danh sách") }
+}</code></pre>
+
+    <h4>key và contentType</h4>
+    <ul>
+      <li><code>key</code>: định danh ổn định cho mỗi mục, thường là <code>id</code> từ dữ liệu: <code>items(notes, key = { it.id }) { … }</code>. Mặc định Compose nhận diện mục theo <em>vị trí</em>; khi thêm, xóa hay đổi thứ tự, trạng thái <code>remember</code> bên trong mục có thể "dính" sang mục khác. Có <code>key</code>, trạng thái đi theo đúng dữ liệu. <code>key</code> phải duy nhất trong cả danh sách.</li>
+      <li><code>contentType</code>: cho Compose biết mục thuộc loại giao diện nào (tiêu đề, sản phẩm, quảng cáo…). Compose chỉ tái sử dụng mục cũ cho mục mới cùng loại, giúp cuộn mượt hơn khi danh sách có nhiều kiểu dòng.</li>
+    </ul>
+
+    <h4>Tham số quan trọng của LazyColumn</h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Tham số</th><th>Ý nghĩa</th></tr></thead>
+      <tbody>
+        <tr><td><code>state</code></td><td>Đối tượng <code>LazyListState</code> để đọc và điều khiển vị trí cuộn.</td></tr>
+        <tr><td><code>contentPadding</code></td><td>Khoảng đệm quanh <em>nội dung</em>, ví dụ <code>PaddingValues(16.dp)</code>. Khác <code>Modifier.padding</code>: mục vẫn cuộn xuyên qua vùng đệm thay vì bị cắt ở mép.</td></tr>
+        <tr><td><code>verticalArrangement</code></td><td>Thường dùng <code>Arrangement.spacedBy(8.dp)</code> để tạo khoảng cách đều giữa các mục. <code>LazyRow</code> dùng <code>horizontalArrangement</code>.</td></tr>
+        <tr><td><code>horizontalAlignment</code></td><td>Căn các mục theo chiều ngang (<code>LazyRow</code> dùng <code>verticalAlignment</code>).</td></tr>
+        <tr><td><code>reverseLayout</code></td><td>Đảo chiều: mục đầu tiên nằm ở đáy, hợp với màn hình chat.</td></tr>
+        <tr><td><code>userScrollEnabled</code></td><td>Đặt <code>false</code> để chặn người dùng tự cuộn.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h4>LazyListState: đọc và điều khiển vị trí cuộn</h4>
+    <ul>
+      <li>Tạo bằng <code>val listState = rememberLazyListState()</code> rồi truyền vào <code>LazyColumn(state = listState)</code>.</li>
+      <li>Đọc: <code>firstVisibleItemIndex</code> (chỉ số mục đầu tiên đang thấy), <code>firstVisibleItemScrollOffset</code>, <code>isScrollInProgress</code>, <code>layoutInfo</code>.</li>
+      <li>Điều khiển: <code>scrollToItem(index)</code> (nhảy ngay) và <code>animateScrollToItem(index)</code> (cuộn có hiệu ứng). Cả hai là hàm <code>suspend</code>, nên gọi trong coroutine lấy từ <code>rememberCoroutineScope()</code>.</li>
+      <li>Khi suy ra một giá trị từ vị trí cuộn (ví dụ "có hiện nút lên đầu trang không"), bọc trong <code>remember { derivedStateOf { … } }</code> để giao diện chỉ cập nhật khi kết quả thật sự đổi, thay vì theo từng pixel cuộn.</li>
+    </ul>
+
+    <h4>Hiệu ứng thêm, xóa, đổi chỗ mục</h4>
+    <p>Gắn <code>Modifier.animateItem()</code> lên phần tử gốc của mỗi mục, Compose sẽ tự làm mờ dần khi mục xuất hiện/biến mất và trượt mượt khi mục đổi vị trí. Có thể tùy chỉnh qua <code>fadeInSpec</code>, <code>placementSpec</code>, <code>fadeOutSpec</code>. Hiệu ứng chỉ hoạt động khi mục có <code>key</code>.</p>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>1. Danh sách ghi chú cơ bản</h4>
+    <pre><code class="language-kotlin">data class Note(val id: Long, val title: String, val updatedAt: String)
+
+@Composable
+fun NoteList(
+    notes: List&lt;Note&gt;,
+    onNoteClick: (Note) -&gt; Unit,
+    modifier: Modifier = Modifier
+) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        item {
+            Text(
+                text = "Ghi chú của tôi (${notes.size})",
+                style = MaterialTheme.typography.titleLarge
+            )
+        }
+        items(items = notes, key = { it.id }) { note -&gt;
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable { onNoteClick(note) }
+                    .padding(16.dp)
+            ) {
+                Text(text = note.title, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = note.updatedAt,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun NoteListPreview() {
+    val sample = List(50) { i -&gt;
+        Note(id = i.toLong(), title = "Ghi chú số ${i + 1}", updatedAt = "Cập nhật ${i + 1} giờ trước")
+    }
+    NoteList(notes = sample, onNoteClick = {})
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Tiêu đề "Ghi chú của tôi (50)" ở trên, bên dưới là 50 thẻ bo góc cách nhau 8dp. Khi cuộn, các thẻ trượt qua vùng đệm 16dp ở mép trên và dưới chứ không bị cắt cụt.</p>
+
+    <h4>2. Trang chủ cửa hàng: LazyRow danh mục nằm trong LazyColumn</h4>
+    <pre><code class="language-kotlin">data class Product(val id: Int, val name: String, val price: String, val category: String)
+
+private val shopCategories = listOf("Tất cả", "Áo", "Quần", "Giày", "Phụ kiện", "Túi xách")
+
+@Composable
+fun CategoryChips(
+    selected: String,
+    onSelect: (String) -&gt; Unit,
+    modifier: Modifier = Modifier
+) {
+    LazyRow(
+        modifier = modifier,
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(items = shopCategories, key = { it }) { category -&gt;
+            val isSelected = category == selected
+            Text(
+                text = category,
+                style = MaterialTheme.typography.labelLarge,
+                color = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(
+                        if (isSelected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.surfaceVariant
+                    )
+                    .clickable { onSelect(category) }
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun ShopHome(products: List&lt;Product&gt;, modifier: Modifier = Modifier) {
+    var selected by rememberSaveable { mutableStateOf("Tất cả") }
+    val visibleProducts = remember(products, selected) {
+        if (selected == "Tất cả") products else products.filter { it.category == selected }
+    }
+
+    LazyColumn(modifier = modifier.fillMaxSize()) {
+        item(contentType = "title") {
+            Text(
+                text = "Danh mục",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(16.dp)
+            )
+        }
+        item(contentType = "categories") {
+            CategoryChips(selected = selected, onSelect = { selected = it })
+        }
+        items(
+            items = visibleProducts,
+            key = { it.id },
+            contentType = { "product" }
+        ) { product -&gt;
+            Column {
+                ListItem(
+                    headlineContent = { Text(product.name) },
+                    supportingContent = { Text(product.price) }
+                )
+                HorizontalDivider()
+            }
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Dưới chữ "Danh mục" là một dải nút hình viên thuốc cuộn ngang được; nút đang chọn có nền màu chủ đạo. Chạm vào "Giày" thì danh sách sản phẩm cuộn dọc bên dưới chỉ còn các đôi giày. Lồng <code>LazyRow</code> trong <code>LazyColumn</code> là hợp lệ vì hai danh sách cuộn theo hai hướng khác nhau.</p>
+
+    <h4>3. Danh bạ có tiêu đề theo chữ cái, nút "lên đầu" và hiệu ứng xóa</h4>
+    <pre><code class="language-kotlin">data class Contact(val id: Long, val name: String, val phone: String)
+
+@Composable
+fun ContactBook(
+    contacts: List&lt;Contact&gt;,
+    onDelete: (Contact) -&gt; Unit,
+    modifier: Modifier = Modifier
+) {
+    // Nhóm theo chữ cái đầu; chỉ tính lại khi danh sách đổi
+    val grouped = remember(contacts) {
+        contacts
+            .sortedBy { it.name }
+            .groupBy { it.name.first().uppercaseChar() }
+    }
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val showScrollToTop by remember {
+        derivedStateOf { listState.firstVisibleItemIndex &gt; 3 }
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        LazyColumn(
+            state = listState,
+            contentPadding = PaddingValues(bottom = 88.dp)
+        ) {
+            grouped.forEach { (letter, group) -&gt;
+                stickyHeader(key = "header-$letter", contentType = "header") {
+                    Text(
+                        text = letter.toString(),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceContainer)
+                            .padding(horizontal = 16.dp, vertical = 6.dp)
+                    )
+                }
+                items(
+                    items = group,
+                    key = { it.id },
+                    contentType = { "contact" }
+                ) { contact -&gt;
+                    ListItem(
+                        headlineContent = { Text(contact.name) },
+                        supportingContent = { Text(contact.phone) },
+                        trailingContent = {
+                            IconButton(onClick = { onDelete(contact) }) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_delete),
+                                    contentDescription = "Xóa ${contact.name}"
+                                )
+                            }
+                        },
+                        modifier = Modifier.animateItem()
+                    )
+                }
+            }
+        }
+
+        if (showScrollToTop) {
+            SmallFloatingActionButton(
+                onClick = { scope.launch { listState.animateScrollToItem(0) } },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_arrow_upward),
+                    contentDescription = "Lên đầu danh sách"
+                )
+            }
+        }
+    }
+}
+
+@Preview(showBackground = true, heightDp = 640)
+@Composable
+fun ContactBookPreview() {
+    val names = listOf(
+        "An", "Anh", "Bảo", "Bình", "Chi", "Cường", "Dũng", "Giang", "Hà", "Hải",
+        "Hùng", "Khoa", "Lan", "Linh", "Minh", "Nam", "Phương", "Quân", "Thảo", "Vy"
+    )
+    var contacts by remember {
+        mutableStateOf(names.mapIndexed { i, name -&gt; Contact(i.toLong(), name, "09${i}0 123 456") })
+    }
+    ContactBook(contacts = contacts, onDelete = { removed -&gt; contacts = contacts - removed })
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Danh bạ chia nhóm A, B, C…; khi cuộn, chữ cái của nhóm hiện tại dính ở mép trên cho tới khi nhóm sau đẩy nó đi. Cuộn quá vài mục, nút tròn nhỏ có mũi tên hiện ở góc dưới phải; bấm vào thì danh sách cuộn mượt về đầu. Bấm biểu tượng thùng rác, dòng đó mờ dần và các dòng bên dưới trượt lên lấp chỗ.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li><strong>Không lồng danh sách cuộn cùng hướng.</strong> Đặt <code>LazyColumn</code> trong <code>Column</code> có <code>verticalScroll</code> (hoặc trong một <code>LazyColumn</code> khác) sẽ gây lỗi lúc chạy, vì LazyColumn nhận chiều cao tối đa vô cực và không biết nên dừng ở đâu. Cách đúng: dùng <em>một</em> LazyColumn duy nhất và ghép nhiều khối <code>item</code>/<code>items</code> như ví dụ 2. Lồng khác hướng (LazyRow trong LazyColumn) thì không sao.</li>
+      <li><strong>Tránh mục có kích thước 0.</strong> Ví dụ ảnh tải từ mạng ban đầu cao 0px: LazyColumn tưởng rằng rất nhiều mục vừa màn hình và tạo hết chúng một lúc, rồi phải sắp xếp lại khi ảnh về. Hãy đặt kích thước cố định hoặc <code>aspectRatio</code> cho vùng ảnh.</li>
+      <li><strong>Mục có trạng thái thì phải có key.</strong> Nếu mục dùng <code>remember</code> (ô đánh dấu, trạng thái mở rộng…) mà không có <code>key</code>, trạng thái sẽ bám theo vị trí và nhảy sang mục khác khi danh sách thay đổi. Dùng chỉ số làm key cũng sai y như vậy; hãy dùng <code>id</code> thật. Muốn dùng <code>rememberSaveable</code> trong mục thì key phải là kiểu lưu được vào <code>Bundle</code> (<code>Int</code>, <code>Long</code>, <code>String</code>…).</li>
+      <li><strong>Key trùng gây crash.</strong> Mọi key trong cùng một LazyColumn, kể cả key của tiêu đề, phải khác nhau. Ví dụ 3 dùng tiền tố <code>"header-"</code> để tránh trùng với id liên hệ.</li>
+      <li><strong>Không xử lý dữ liệu nặng trong thân composable.</strong> Sắp xếp, lọc, nhóm nên đặt trong <code>remember(…)</code> như trên hoặc tốt hơn là trong <a href="#viewmodel">ViewModel</a>, để không bị chạy lại ở mỗi lần recompose.</li>
+      <li><strong>Mỗi phần tử độc lập nên là một mục riêng.</strong> Gom nhiều thẻ vào chung một <code>item { }</code> khiến chúng luôn được tạo, cuộn và tái sử dụng cùng nhau. Chỉ gộp khi chúng là một khối, như dòng sản phẩm kèm đường kẻ ở ví dụ 2.</li>
+      <li><strong>Tiêu đề dính cần có nền.</strong> Nếu không đặt <code>background</code> cho <code>stickyHeader</code>, các mục cuộn bên dưới sẽ lộ qua chữ. Ở một số phiên bản Compose cũ, <code>stickyHeader</code> còn là API thử nghiệm và cần <code>@OptIn(ExperimentalFoundationApi::class)</code>.</li>
+    </ul>
+    <div class="callout tip"><strong>Mẹo:</strong> Cần lưới nhiều cột thì xem <a href="#lazy-grid">LazyVerticalGrid</a>; cần lật từng trang (onboarding, ảnh sản phẩm) thì xem <a href="#pager-flow">Pager</a>. Cả hai dùng chung tư duy DSL <code>item</code>/<code>items</code> và <code>key</code> như ở đây.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/lists" target="_blank" rel="noopener">Lazy lists and lazy grids</a></p>
+</section>

@@ -1,0 +1,255 @@
+<section class="topic" id="interop" data-title="Kết hợp với View">
+  <h2>Kết hợp Compose với View/XML</h2>
+  <p class="lead">Bạn không cần viết lại cả app mới dùng được Compose. Compose và hệ View cũ có thể sống chung trong cùng một màn hình, theo cả hai chiều, nhờ đó bạn chuyển đổi dần dần và vẫn dùng được các thư viện chỉ hỗ trợ View.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p><strong>Interop</strong> (khả năng tương tác) là bộ API cho phép trộn hai hệ giao diện. Có hai cầu nối chính:</p>
+    <ul>
+      <li><code>ComposeView</code>: một <code>View</code> bình thường nhưng bên trong chứa nội dung Compose. Bạn đặt nó vào layout XML, Fragment hay bất cứ đâu nhận View.</li>
+      <li><code>AndroidView</code>: một composable chứa bên trong một <code>View</code> cũ. Bạn dùng nó để nhúng <code>WebView</code>, <code>MapView</code>, view quảng cáo hay view tùy biến vào màn hình Compose.</li>
+    </ul>
+    <p>Vì sao cần? Các dự án lớn có hàng trăm màn hình XML, viết lại một lần là quá rủi ro. Interop cho phép viết màn hình mới bằng Compose và thay dần từng phần của màn hình cũ. Ngược lại, một số thành phần (trình duyệt web, bản đồ, quảng cáo, trình phát video cũ) vẫn chỉ có dạng View, nên app thuần Compose cũng thường cần <code>AndroidView</code>.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+
+    <h4>1. Compose bên trong layout XML</h4>
+    <pre><code class="language-markup">&lt;androidx.compose.ui.platform.ComposeView
+    android:id="@+id/compose_promo"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content" /&gt;</code></pre>
+    <pre><code class="language-kotlin">// Trong Activity, sau setContentView(...)
+findViewById&lt;ComposeView&gt;(R.id.compose_promo).setContent {
+    AppTheme {
+        Text("Xin chào từ Compose!")
+    }
+}</code></pre>
+
+    <h4>2. Compose làm toàn bộ giao diện của Fragment</h4>
+    <pre><code class="language-kotlin">class ProfileFragment : Fragment() {
+    private val viewModel: ProfileViewModel by viewModels()
+
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View = ComposeView(requireContext()).apply {
+        setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+        setContent {
+            AppTheme {
+                val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+                ProfileScreen(uiState = uiState, onEditClick = viewModel::onEditClick)
+            }
+        }
+    }
+}</code></pre>
+    <p><code>ViewCompositionStrategy</code> quyết định <em>khi nào</em> nội dung Compose bên trong <code>ComposeView</code> bị hủy (dispose):</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Chiến lược</th><th>Hủy composition khi</th><th>Dùng cho</th></tr></thead>
+      <tbody>
+        <tr><td><code>DisposeOnDetachedFromWindowOrReleasedFromPool</code> (mặc định)</td><td>View rời khỏi cửa sổ; nếu nằm trong vùng chứa có pool như <code>RecyclerView</code> thì đợi tới khi bị loại khỏi pool</td><td>Activity, item của <code>RecyclerView</code></td></tr>
+        <tr><td><code>DisposeOnViewTreeLifecycleDestroyed</code></td><td>Lifecycle của cây View bị hủy (với Fragment là vòng đời view của Fragment)</td><td><code>ComposeView</code> trong Fragment</td></tr>
+        <tr><td><code>DisposeOnLifecycleDestroyed(lifecycle)</code></td><td>Một <code>Lifecycle</code> do bạn chỉ định bị hủy</td><td>Khi bạn biết rõ đối tượng nào sở hữu view</td></tr>
+        <tr><td><code>DisposeOnDetachedFromWindow</code></td><td>Ngay khi view rời khỏi cửa sổ</td><td>Hiếm khi cần</td></tr>
+      </tbody>
+    </table></div>
+    <p>Với Fragment, view có thể tạm rời cửa sổ (vd lúc chuyển cảnh) rồi gắn lại, nên chiến lược mặc định có thể hủy composition quá sớm và làm mất state. <code>DisposeOnViewTreeLifecycleDestroyed</code> giữ composition sống đúng bằng vòng đời view của Fragment.</p>
+
+    <h4>3. View bên trong Compose: <code>AndroidView</code></h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Tham số</th><th>Vai trò</th></tr></thead>
+      <tbody>
+        <tr><td><code>factory</code></td><td>Tạo View từ <code>Context</code>; chỉ chạy một lần</td></tr>
+        <tr><td><code>update</code></td><td>Chạy sau khi tạo và mỗi khi state Compose được đọc bên trong nó thay đổi; nơi đẩy dữ liệu mới vào View</td></tr>
+        <tr><td><code>modifier</code></td><td>Kích thước, padding, vị trí như mọi composable khác</td></tr>
+        <tr><td><code>onReset</code></td><td>Khi khác <code>null</code>, View được phép tái sử dụng (vd trong <code>LazyColumn</code>); chạy trước khi dùng lại để xóa dữ liệu cũ</td></tr>
+        <tr><td><code>onRelease</code></td><td>Chạy khi View rời composition vĩnh viễn; nơi giải phóng tài nguyên</td></tr>
+      </tbody>
+    </table></div>
+    <pre><code class="language-kotlin">@Composable
+fun LegacyLabel(message: String, modifier: Modifier = Modifier) {
+    AndroidView(
+        factory = { context -&gt;
+            TextView(context).apply { textSize = 18f }   // tạo một lần
+        },
+        update = { textView -&gt;
+            textView.text = message                       // chạy lại khi message đổi
+        },
+        modifier = modifier
+    )
+}</code></pre>
+
+    <h4>4. Nhúng cả một layout XML: <code>AndroidViewBinding</code></h4>
+    <p>Nếu đã có sẵn layout XML (vd <code>banner_layout.xml</code> chứa <code>@+id/banner_title</code>), bạn nhúng nó qua lớp ViewBinding sinh tự động. Cách này cũng dùng được với layout chứa <code>FragmentContainerView</code>.</p>
+    <pre><code class="language-kotlin">// app/build.gradle.kts
+android {
+    buildFeatures { viewBinding = true }
+}
+dependencies {
+    implementation("androidx.compose.ui:ui-viewbinding")
+}
+
+// Trong code Compose
+@Composable
+fun LegacyBanner(title: String) {
+    AndroidViewBinding(BannerLayoutBinding::inflate) {
+        // "this" là BannerLayoutBinding
+        bannerTitle.text = title
+    }
+}</code></pre>
+
+    <h4>5. Chia sẻ theme và ViewModel</h4>
+    <ul>
+      <li>Compose <strong>không</strong> tự đọc theme XML. Hãy tạo theme Compose (<code>MaterialTheme</code> với màu, chữ, hình dạng) khớp với theme XML (xem <a href="#custom-theme">Theme tùy chỉnh</a>) và bọc mọi <code>setContent</code> trong theme đó. Trong giai đoạn chuyển tiếp, có thể lấy màu từ <code>colors.xml</code> bằng <code>colorResource(R.color.brand)</code>.</li>
+      <li>ViewModel dùng chung bình thường: Fragment lấy bằng <code>by viewModels()</code> rồi truyền state xuống composable như ví dụ ở mục 2. Gọi <code>viewModel()</code> bên trong <code>ComposeView</code> của Fragment cũng trả về cùng instance gắn với Fragment đó.</li>
+    </ul>
+
+    <h4>6. Chiến lược di chuyển dần (từ dưới lên)</h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Bước</th><th>Việc cần làm</th><th>Ghi chú</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Thêm Compose vào dự án, tạo theme Compose khớp theme XML</td><td>Xem <a href="#thiet-lap-du-an">Thiết lập dự án</a></td></tr>
+        <tr><td>2</td><td>Viết mọi màn hình <em>mới</em> bằng Compose</td><td>Ngừng tạo thêm layout XML</td></tr>
+        <tr><td>3</td><td>Viết lại các thành phần dùng chung (nút, thẻ, ô nhập) thành composable</td><td>Thành bộ component cho cả app</td></tr>
+        <tr><td>4</td><td>Thay dần từng phần trong màn hình cũ bằng <code>ComposeView</code>, từ phần nhỏ đến phần lớn</td><td>Mỗi lần thay một phần, test kỹ rồi phát hành</td></tr>
+        <tr><td>5</td><td>Khi cả màn hình đã là Compose, Fragment chỉ còn trả về <code>ComposeView</code>; sau đó chuyển điều hướng sang Navigation Compose</td><td>Xem <a href="#navigation">Điều hướng</a></td></tr>
+        <tr><td>6</td><td>Xóa layout XML, View tùy biến và thư viện không còn dùng</td><td>App gọn hơn, build nhanh hơn</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+
+    <h4>Ví dụ 1: Màn hình XML cũ thêm một thẻ ưu đãi viết bằng Compose</h4>
+    <p class="code-caption"><code>res/layout/activity_order.xml</code></p>
+    <pre><code class="language-markup">&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"&gt;
+
+    &lt;TextView
+        android:id="@+id/order_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Đơn hàng #1024"
+        android:textSize="22sp" /&gt;
+
+    &lt;!-- Phần mới viết bằng Compose --&gt;
+    &lt;androidx.compose.ui.platform.ComposeView
+        android:id="@+id/compose_promo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp" /&gt;
+
+    &lt;Button
+        android:id="@+id/btn_checkout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="Thanh toán" /&gt;
+&lt;/LinearLayout&gt;</code></pre>
+    <p class="code-caption">Activity cũ giữ nguyên, chỉ thêm phần gắn nội dung Compose</p>
+    <pre><code class="language-kotlin">class OrderActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_order)
+
+        findViewById&lt;ComposeView&gt;(R.id.compose_promo).setContent {
+            AppTheme {
+                PromoCard(
+                    code = "GIAM20",
+                    onApply = { code -&gt;
+                        Toast.makeText(this, "Đã áp dụng mã $code", Toast.LENGTH_SHORT).show()
+                    }
+                )
+            }
+        }
+        // Phần code View cũ (nút Thanh toán...) không cần sửa
+    }
+}
+
+@Composable
+fun PromoCard(code: String, onApply: (String) -&gt; Unit) {
+    var applied by rememberSaveable { mutableStateOf(false) }
+    Card(Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Ưu đãi cho bạn", style = MaterialTheme.typography.titleMedium)
+                Text("Nhập mã $code để giảm 20%")
+            }
+            Button(onClick = { applied = true; onApply(code) }, enabled = !applied) {
+                Text(if (applied) "Đã dùng" else "Áp dụng")
+            }
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Màn hình đơn hàng vẫn có tiêu đề và nút "Thanh toán" kiểu View cũ, ở giữa xuất hiện một thẻ Material 3 "Ưu đãi cho bạn". Bấm "Áp dụng" thì hiện Toast, nút đổi thành "Đã dùng" và bị tắt; xoay màn hình trạng thái này vẫn được giữ nhờ <code>rememberSaveable</code> và <code>android:id</code> của <code>ComposeView</code>.</p>
+
+    <h4>Ví dụ 2: Màn hình Compose nhúng <code>WebView</code> hiển thị điều khoản</h4>
+    <pre><code class="language-kotlin">@Composable
+fun TermsScreen(termsUrl: String, onAccepted: () -&gt; Unit) {
+    var isLoading by remember { mutableStateOf(true) }
+    var agreed by rememberSaveable { mutableStateOf(false) }
+
+    Column(Modifier.fillMaxSize().padding(16.dp)) {
+        Text("Điều khoản sử dụng", style = MaterialTheme.typography.headlineSmall)
+        Spacer(Modifier.height(8.dp))
+
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            AndroidView(
+                factory = { context -&gt;
+                    WebView(context).apply {
+                        webViewClient = object : WebViewClient() {
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                isLoading = false
+                            }
+                        }
+                    }
+                },
+                update = { webView -&gt;
+                    // Chỉ tải khi URL thật sự đổi, tránh tải lại sau mỗi lần cập nhật
+                    if (webView.tag != termsUrl) {
+                        webView.tag = termsUrl
+                        webView.loadUrl(termsUrl)
+                    }
+                },
+                onRelease = { webView -&gt; webView.destroy() },   // giải phóng WebView
+                modifier = Modifier.fillMaxSize()
+            )
+            if (isLoading) {
+                CircularProgressIndicator(Modifier.align(Alignment.Center))
+            }
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = agreed, onCheckedChange = { agreed = it })
+            Text("Tôi đã đọc và đồng ý với điều khoản")
+        }
+        Button(onClick = onAccepted, enabled = agreed, modifier = Modifier.fillMaxWidth()) {
+            Text("Tiếp tục")
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Phía trên là tiêu đề, giữa là trang điều khoản tải từ <code>termsUrl</code> (có vòng xoay trong lúc tải), cuộn được như trình duyệt. Nút "Tiếp tục" chỉ bật sau khi người dùng đánh dấu ô đồng ý. Khi rời màn hình, <code>onRelease</code> hủy <code>WebView</code> để giải phóng bộ nhớ.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li>Đặt <code>android:id</code> riêng cho mỗi <code>ComposeView</code> trong layout; thiếu id thì <code>rememberSaveable</code> bên trong không khôi phục được state.</li>
+      <li><code>ComposeView</code> trong Fragment nên dùng <code>DisposeOnViewTreeLifecycleDestroyed</code>; quên đặt có thể khiến state bị mất khi chuyển cảnh.</li>
+      <li><code>factory</code> chỉ chạy một lần. Đừng đọc state Compose trong đó và mong View tự cập nhật; mọi dữ liệu thay đổi phải đặt trong <code>update</code>. Listener gắn trong <code>factory</code> sẽ giữ lambda cũ, nên gắn trong <code>update</code> hoặc dùng <code>rememberUpdatedState</code>.</li>
+      <li>Khi đặt <code>AndroidView</code> trong <code>LazyColumn</code>, truyền <code>onReset</code> để View được tái sử dụng thay vì tạo mới cho mỗi item.</li>
+      <li><code>WebView</code> cần quyền <code>android.permission.INTERNET</code> trong manifest. JavaScript tắt theo mặc định; chỉ bật (<code>settings.javaScriptEnabled = true</code>) cho nội dung bạn tin cậy. Trang sẽ tải lại khi Activity được tạo lại.</li>
+      <li>Hạn chế lồng qua lại nhiều tầng (Compose trong View trong Compose…): khó gỡ lỗi và tốn hiệu năng. Mục tiêu cuối cùng là mỗi màn hình thuần một hệ.</li>
+    </ul>
+    <div class="callout tip"><strong>Mẹo:</strong> Bắt đầu di chuyển từ những màn hình đơn giản, ít người dùng (Cài đặt, Giới thiệu) để cả nhóm quen với Compose trước khi đụng vào các màn hình quan trọng.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/migrate/interoperability-apis?hl=vi" target="_blank" rel="noopener">API khả năng tương tác</a></p>
+</section>

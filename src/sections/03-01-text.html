@@ -1,0 +1,230 @@
+<section class="topic" id="text" data-title="Text">
+  <h2>Text và kiểu chữ</h2>
+  <p class="lead">Gần như màn hình nào cũng có chữ: tiêu đề, giá tiền, mô tả, điều khoản. <code>Text</code> là composable dùng để hiển thị chữ, kèm cả một bộ công cụ để định dạng, đa ngôn ngữ và tạo liên kết bấm được.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p><code>Text</code> là hàm composable của Material 3 (gói <code>androidx.compose.material3</code>) dùng để vẽ một đoạn chữ lên màn hình. Nó tương đương với <code>TextView</code> trong hệ thống View cũ, nhưng thay vì đặt thuộc tính trong XML rồi gọi <code>setText()</code>, bạn chỉ cần gọi <code>Text("Xin chào")</code> và truyền tham số. Khi dữ liệu đổi, Compose gọi lại hàm và chữ tự cập nhật.</p>
+    <p>Bên dưới, <code>Text</code> của Material dựa trên <code>BasicText</code> (tầng foundation, không có giao diện Material). Khác biệt quan trọng: <code>Text</code> tự lấy màu và kiểu chữ từ theme (<code>MaterialTheme</code>, <code>LocalContentColor</code>) nên chữ luôn hợp với giao diện sáng/tối mà bạn không cần chỉnh tay.</p>
+    <p>Để định dạng <em>một phần</em> đoạn chữ (in đậm vài từ, gạch ngang giá cũ, gắn link), Compose dùng <code>AnnotatedString</code> – chuỗi có "chú thích" kiểu dáng cho từng khoảng ký tự, thay cho <code>SpannableString</code> trong View.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>Các tham số chính của Text</h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Tham số</th><th>Ý nghĩa</th><th>Ví dụ giá trị</th></tr></thead>
+      <tbody>
+        <tr><td><code>text</code></td><td>Nội dung hiển thị (<code>String</code> hoặc <code>AnnotatedString</code>)</td><td><code>"Giỏ hàng"</code></td></tr>
+        <tr><td><code>color</code></td><td>Màu chữ; bỏ trống thì lấy từ <code>style</code> rồi tới <code>LocalContentColor</code></td><td><code>MaterialTheme.colorScheme.primary</code></td></tr>
+        <tr><td><code>fontSize</code></td><td>Cỡ chữ, đơn vị <code>sp</code></td><td><code>18.sp</code></td></tr>
+        <tr><td><code>fontWeight</code></td><td>Độ đậm</td><td><code>FontWeight.Bold</code>, <code>FontWeight.Medium</code></td></tr>
+        <tr><td><code>fontStyle</code></td><td>Nghiêng hay thường</td><td><code>FontStyle.Italic</code></td></tr>
+        <tr><td><code>fontFamily</code></td><td>Họ phông chữ</td><td><code>FontFamily.Serif</code>, phông tùy chỉnh</td></tr>
+        <tr><td><code>letterSpacing</code></td><td>Khoảng cách giữa các ký tự</td><td><code>0.5.sp</code></td></tr>
+        <tr><td><code>textDecoration</code></td><td>Gạch chân / gạch ngang</td><td><code>TextDecoration.LineThrough</code></td></tr>
+        <tr><td><code>textAlign</code></td><td>Căn lề trong chiều rộng của Text</td><td><code>TextAlign.Center</code>, <code>TextAlign.End</code></td></tr>
+        <tr><td><code>lineHeight</code></td><td>Chiều cao mỗi dòng</td><td><code>24.sp</code></td></tr>
+        <tr><td><code>maxLines</code> / <code>minLines</code></td><td>Giới hạn số dòng tối đa / tối thiểu</td><td><code>2</code></td></tr>
+        <tr><td><code>overflow</code></td><td>Xử lý khi chữ dài hơn chỗ trống</td><td><code>TextOverflow.Ellipsis</code> (thêm "…"), <code>TextOverflow.Clip</code></td></tr>
+        <tr><td><code>softWrap</code></td><td>Có tự xuống dòng hay không</td><td><code>false</code> để giữ một dòng</td></tr>
+        <tr><td><code>style</code></td><td>Gói kiểu chữ dựng sẵn (<code>TextStyle</code>)</td><td><code>MaterialTheme.typography.titleLarge</code></td></tr>
+      </tbody>
+    </table></div>
+    <p>Quy tắc ưu tiên: tham số truyền trực tiếp (<code>fontWeight</code>, <code>color</code>…) sẽ <strong>ghi đè</strong> giá trị tương ứng trong <code>style</code>. Cách làm tốt là chọn một <code>style</code> từ theme rồi chỉ chỉnh vài chỗ khác biệt.</p>
+
+    <h4>Dùng thang chữ của Material 3</h4>
+    <p><code>MaterialTheme.typography</code> có 15 kiểu chia thành 5 nhóm, mỗi nhóm 3 cỡ Large/Medium/Small: <code>display…</code> (số/chữ rất to), <code>headline…</code> (tiêu đề màn hình), <code>title…</code> (tiêu đề thẻ, mục), <code>body…</code> (nội dung), <code>label…</code> (nhãn nút, chú thích nhỏ). Ưu tiên dùng các kiểu này thay vì tự đặt <code>fontSize</code> khắp nơi, để sau này đổi theme là cả app đổi theo (xem <a href="#custom-theme">Tùy biến theme</a>).</p>
+    <pre><code class="language-kotlin">Text("Đơn hàng của bạn", style = MaterialTheme.typography.headlineSmall)
+Text(
+    text = "Giao trong 2 giờ",
+    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+)</code></pre>
+
+    <h4>Chuỗi từ tài nguyên: stringResource và pluralStringResource</h4>
+    <p>Đừng viết cứng chữ trong code nếu app cần đa ngôn ngữ. Đặt chuỗi vào <code>res/values/strings.xml</code> rồi đọc bằng <code>stringResource()</code>. Chuỗi có tham số dùng ký hiệu <code>%1$s</code> (chuỗi), <code>%1$d</code> (số nguyên). Với chuỗi phụ thuộc số lượng, dùng thẻ <code>&lt;plurals&gt;</code> và <code>pluralStringResource()</code>.</p>
+    <p class="code-caption">res/values/strings.xml</p>
+    <pre><code class="language-markup">&lt;resources&gt;
+    &lt;string name="cart_title"&gt;Giỏ hàng&lt;/string&gt;
+    &lt;string name="greeting"&gt;Xin chào, %1$s!&lt;/string&gt;
+    &lt;plurals name="cart_items"&gt;
+        &lt;item quantity="one"&gt;%d sản phẩm&lt;/item&gt;
+        &lt;item quantity="other"&gt;%d sản phẩm&lt;/item&gt;
+    &lt;/plurals&gt;
+&lt;/resources&gt;</code></pre>
+    <pre><code class="language-kotlin">@Composable
+fun CartHeader(userName: String, itemCount: Int) {
+    Column {
+        Text(stringResource(R.string.cart_title), style = MaterialTheme.typography.titleLarge)
+        Text(stringResource(R.string.greeting, userName))
+        // Tham số thứ 2 chọn dạng số ít/nhiều, tham số thứ 3 điền vào %d
+        Text(pluralStringResource(R.plurals.cart_items, itemCount, itemCount))
+    }
+}</code></pre>
+
+    <h4>Định dạng từng phần với buildAnnotatedString</h4>
+    <p><code>buildAnnotatedString { … }</code> cho phép nối nhiều đoạn chữ, mỗi đoạn một kiểu. Có hai loại kiểu:</p>
+    <ul>
+      <li><code>SpanStyle</code>: áp cho một khoảng ký tự – màu, cỡ, độ đậm, nghiêng, gạch ngang, nền chữ…</li>
+      <li><code>ParagraphStyle</code>: áp cho cả đoạn văn – căn lề (<code>textAlign</code>), <code>lineHeight</code>, thụt đầu dòng. Mỗi <code>ParagraphStyle</code> tự tách thành một đoạn riêng.</li>
+    </ul>
+    <pre><code class="language-kotlin">val note = buildAnnotatedString {
+    withStyle(ParagraphStyle(lineHeight = 22.sp)) {
+        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+            append("Lưu ý: ")
+        }
+        append("Đơn hàng trên 300.000 đ được ")
+        withStyle(SpanStyle(fontStyle = FontStyle.Italic, color = Color(0xFF2E7D32))) {
+            append("miễn phí giao hàng")
+        }
+        append(".")
+    }
+}
+Text(note)</code></pre>
+
+    <h4>Link bấm được: LinkAnnotation.Url và withLink</h4>
+    <p>Từ Compose 1.7, bạn bọc phần chữ cần làm link trong <code>withLink(LinkAnnotation.Url("https://…")) { … }</code>. Khi người dùng chạm vào, Compose tự mở trình duyệt; không cần tự bắt sự kiện chạm. Muốn tô màu, gạch chân link thì truyền <code>styles = TextLinkStyles(style = SpanStyle(…))</code>.</p>
+
+    <h4>Cho phép chọn và sao chép chữ</h4>
+    <p>Mặc định chữ trong <code>Text</code> không chọn được. Bọc vùng cần chọn trong <code>SelectionContainer { … }</code>; phần nào bên trong không muốn cho chọn thì bọc tiếp bằng <code>DisableSelection { … }</code>.</p>
+    <pre><code class="language-kotlin">SelectionContainer {
+    Column {
+        Text("Mã đơn hàng: DH-2026-08812")
+        DisableSelection {
+            Text("Nhấn giữ mã ở trên để sao chép", style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}</code></pre>
+
+    <h4>Phông chữ tùy chỉnh</h4>
+    <ol>
+      <li>Tạo thư mục <code>res/font</code>, chép file <code>.ttf</code>/<code>.otf</code> vào. Tên file chỉ gồm chữ thường, số và dấu gạch dưới, ví dụ <code>be_vietnam_pro_regular.ttf</code>.</li>
+      <li>Khai báo một <code>FontFamily</code> gom các độ đậm lại.</li>
+      <li>Dùng trực tiếp qua <code>fontFamily</code>, hoặc tốt hơn là gắn vào <code>Typography</code> của theme.</li>
+    </ol>
+    <pre><code class="language-kotlin">val BeVietnamPro = FontFamily(
+    Font(R.font.be_vietnam_pro_regular, FontWeight.Normal),
+    Font(R.font.be_vietnam_pro_medium, FontWeight.Medium),
+    Font(R.font.be_vietnam_pro_bold, FontWeight.Bold)
+)
+
+Text("Thời tiết hôm nay", fontFamily = BeVietnamPro, fontWeight = FontWeight.Bold)</code></pre>
+    <p>Khi bạn yêu cầu <code>FontWeight.Bold</code>, Compose tự chọn file phông có độ đậm khớp trong <code>FontFamily</code>. Nhớ chọn phông hỗ trợ đầy đủ dấu tiếng Việt.</p>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>Ví dụ 1: Tên và mô tả sản phẩm, cắt bớt bằng dấu "…"</h4>
+    <pre><code class="language-kotlin">@Composable
+fun ProductInfo(name: String, description: String, modifier: Modifier = Modifier) {
+    Column(modifier = modifier.padding(16.dp)) {
+        Text(
+            text = name,
+            style = MaterialTheme.typography.titleMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = description,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Preview(showBackground = true, widthDp = 300)
+@Composable
+fun ProductInfoPreview() {
+    MaterialTheme {
+        ProductInfo(
+            name = "Tai nghe không dây Sóng Âm Pro phiên bản đặc biệt",
+            description = "Chống ồn chủ động, pin 30 giờ, sạc 10 phút nghe 3 giờ, kết nối ổn định với hai thiết bị cùng lúc."
+        )
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Tên sản phẩm in đậm vừa, nằm trên một dòng và kết thúc bằng "…" vì quá dài; phần mô tả màu xám nhạt hơn, hiển thị tối đa hai dòng rồi cũng bị cắt bằng "…".</p>
+
+    <h4>Ví dụ 2: Dòng giá có giá cũ gạch ngang</h4>
+    <pre><code class="language-kotlin">@Composable
+fun PriceLine(newPrice: String, oldPrice: String, discountPercent: Int) {
+    val colors = MaterialTheme.colorScheme
+    val priceText = buildAnnotatedString {
+        withStyle(SpanStyle(color = colors.error, fontWeight = FontWeight.Bold, fontSize = 20.sp)) {
+            append(newPrice)
+        }
+        append("  ")
+        withStyle(
+            SpanStyle(
+                color = colors.onSurfaceVariant,
+                textDecoration = TextDecoration.LineThrough
+            )
+        ) {
+            append(oldPrice)
+        }
+        append("  ")
+        withStyle(SpanStyle(color = colors.primary, fontWeight = FontWeight.SemiBold)) {
+            append("-$discountPercent%")
+        }
+    }
+    Text(text = priceText, style = MaterialTheme.typography.bodyMedium)
+}
+
+@Preview(showBackground = true)
+@Composable
+fun PriceLinePreview() {
+    MaterialTheme {
+        PriceLine(newPrice = "349.000 đ", oldPrice = "499.000 đ", discountPercent = 30)
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Một dòng duy nhất: "349.000 đ" to, đậm, màu đỏ; tiếp theo là "499.000 đ" màu xám có gạch ngang; cuối cùng là "-30%" màu chủ đạo của theme.</p>
+
+    <h4>Ví dụ 3: Đoạn điều khoản có link bấm được</h4>
+    <pre><code class="language-kotlin">@Composable
+fun TermsNotice(modifier: Modifier = Modifier) {
+    val linkStyles = TextLinkStyles(
+        style = SpanStyle(
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Medium,
+            textDecoration = TextDecoration.Underline
+        )
+    )
+    val text = buildAnnotatedString {
+        append("Khi bấm Đăng ký, bạn đồng ý với ")
+        withLink(LinkAnnotation.Url("https://example.com/dieu-khoan", styles = linkStyles)) {
+            append("Điều khoản sử dụng")
+        }
+        append(" và ")
+        withLink(LinkAnnotation.Url("https://example.com/bao-mat", styles = linkStyles)) {
+            append("Chính sách quyền riêng tư")
+        }
+        append(" của cửa hàng.")
+    }
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        textAlign = TextAlign.Center,
+        modifier = modifier.padding(horizontal = 24.dp)
+    )
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Đoạn chữ nhỏ căn giữa; hai cụm "Điều khoản sử dụng" và "Chính sách quyền riêng tư" có màu chủ đạo, gạch chân. Chạm vào cụm nào thì trình duyệt mở đúng trang tương ứng.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li><strong>Cỡ chữ luôn dùng <code>sp</code>, không dùng <code>dp</code>.</strong> <code>sp</code> co giãn theo cài đặt cỡ chữ của người dùng (Android 14 trở lên cho phóng tới 200%), còn <code>dp</code> thì không. Người lớn tuổi hoặc người nhìn kém rất cần điều này.</li>
+      <li>Vì chữ có thể phóng to, <strong>đừng đặt chiều cao cố định</strong> (<code>Modifier.height(20.dp)</code>) cho vùng chứa chữ; chữ sẽ bị cắt mất. Dùng <code>heightIn(min = …)</code> hoặc để nội dung tự quyết định chiều cao (xem <a href="#kich-thuoc-rang-buoc">Kích thước và ràng buộc</a>).</li>
+      <li><code>textAlign</code> chỉ có tác dụng khi <code>Text</code> rộng hơn nội dung chữ. Nếu <code>Text</code> chỉ rộng vừa chữ, căn giữa sẽ "không ăn"; hãy thêm <code>Modifier.fillMaxWidth()</code>.</li>
+      <li>Muốn <code>overflow = TextOverflow.Ellipsis</code> hoạt động thì phải giới hạn chiều rộng và số dòng (<code>maxLines</code>); nếu không chữ chỉ đơn giản xuống dòng.</li>
+      <li>Tiếng Việt chỉ có một dạng số nhiều (<code>other</code>), nhưng khi app có thêm bản tiếng Anh thì bản đó cần cả <code>one</code> và <code>other</code>. Luôn dùng <code>pluralStringResource</code> thay vì tự viết <code>if (count == 1)</code>. Ở các bản Compose rất cũ, hàm này từng là API thử nghiệm.</li>
+      <li>Hạn chế tự đặt <code>color = Color.Black</code>: chữ sẽ "biến mất" trên nền tối ở chế độ Dark. Dùng màu từ <code>MaterialTheme.colorScheme</code> (ví dụ <code>onSurface</code>, <code>onSurfaceVariant</code>).</li>
+      <li>Trong <code>SelectionContainer</code>, chữ chọn được nhưng không sửa được; nếu cần nhập liệu hãy dùng <a href="#textfield">TextField</a>.</li>
+    </ul>
+    <div class="callout tip"><strong>Mẹo:</strong> Gom các kiểu chữ lặp lại (ví dụ "giá khuyến mãi") vào một hàm composable nhỏ như <code>PriceLine</code> ở trên. Cả app sẽ hiển thị giá đồng nhất và khi cần đổi màu bạn chỉ sửa một chỗ.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/text?hl=vi" target="_blank" rel="noopener">Text in Compose</a></p>
+</section>

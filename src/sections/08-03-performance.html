@@ -1,0 +1,203 @@
+<section class="topic" id="performance" data-title="Hiệu suất">
+  <h2>Hiệu suất trong Compose</h2>
+  <p class="lead">Compose đủ nhanh cho hầu hết màn hình, nhưng vài thói quen nhỏ có thể làm danh sách bị giật hoặc app khởi động chậm. Phần này giúp bạn đo đúng cách, hiểu vì sao UI chậm và áp dụng các kỹ thuật tối ưu phổ biến.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p>Hiệu suất giao diện là khả năng tạo mỗi khung hình đủ nhanh: khoảng 16 ms với màn hình 60 Hz, và còn ít hơn với màn 90 Hz hay 120 Hz. Khung hình nào trễ hạn sẽ bị bỏ qua, người dùng thấy hiện tượng <strong>giật</strong> (jank). Mỗi khung hình trong Compose đi qua ba giai đoạn: <em>composition</em> (chạy composable để biết cần hiển thị gì), <em>layout</em> (đo và đặt vị trí) và <em>drawing</em> (vẽ). Xem thêm ở <a href="#vong-doi-giai-doan">Vòng đời và các giai đoạn</a>.</p>
+    <p>Tối ưu trong Compose phần lớn xoay quanh hai ý: <strong>làm ít việc hơn</strong> (tránh <em>recomposition</em>, tức chạy lại composable, khi không cần) và <strong>đọc state ở giai đoạn muộn nhất có thể</strong> (giá trị chỉ ảnh hưởng tới việc vẽ thì nên đọc ở giai đoạn drawing, khỏi phải chạy lại composition).</p>
+    <p>Nguyên tắc quan trọng nhất là <strong>đo trước khi tối ưu</strong>, và đo trên bản <em>release</em> đã bật R8 (công cụ thu gọn và tối ưu mã). Bản debug tắt nhiều tối ưu hóa và mang thêm công cụ hỗ trợ gỡ lỗi nên chậm hơn hẳn; một màn hình giật trên bản debug có thể hoàn toàn mượt trên bản release.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+
+    <h4>1. Chuẩn bị bản release để đo</h4>
+    <p class="code-caption">Trong <code>app/build.gradle.kts</code>: bật R8 và tạm ký bằng khóa debug để cài thử trên máy</p>
+    <pre><code class="language-kotlin">android {
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            // Chỉ để thử trên máy của bạn, đừng dùng khi phát hành thật
+            signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+}</code></pre>
+
+    <h4>2. Baseline Profiles</h4>
+    <p><strong>Baseline Profile</strong> là danh sách các class và hàm mà app dùng nhiều nhất (lúc khởi động, khi cuộn màn hình chính). Khi app được cài, hệ thống biên dịch sẵn những đoạn mã này thành mã máy, nhờ đó lần chạy đầu khởi động nhanh hơn và ít giật hơn. Các thư viện Compose đã kèm sẵn profile của riêng chúng, nhưng app của bạn nên có profile riêng cho các luồng quan trọng. Cách phổ biến: thêm module <em>Baseline Profile Generator</em> trong Android Studio, module này dùng Macrobenchmark và Baseline Profile Gradle plugin để tự chạy app, ghi lại và đóng gói profile vào bản release.</p>
+
+    <h4>3. Các kỹ thuật tối ưu thường gặp</h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Kỹ thuật</th><th>Vấn đề cần giải quyết</th><th>Cách làm</th></tr></thead>
+      <tbody>
+        <tr><td><code>remember</code> cho tính toán nặng</td><td>Phép tính tốn thời gian chạy lại sau mỗi recomposition</td><td><code>remember(input) { tinhToan(input) }</code>: chỉ tính lại khi <code>input</code> đổi</td></tr>
+        <tr><td><code>key</code> + <code>contentType</code> cho lazy list</td><td>Thêm, xóa, đổi thứ tự item làm Compose tạo lại nhiều item và mất state của item</td><td><code>items(list, key = { it.id }, contentType = { it.type })</code>, xem <a href="#lazy-list">Danh sách lười</a></td></tr>
+        <tr><td><code>derivedStateOf</code></td><td>State đổi rất nhanh (vị trí cuộn) nhưng UI chỉ cần một kết quả ít đổi (có hiện nút hay không)</td><td><code>remember { derivedStateOf { listState.firstVisibleItemIndex &gt; 3 } }</code></td></tr>
+        <tr><td>Trì hoãn đọc state bằng modifier dạng lambda</td><td>Giá trị đổi mỗi khung hình (animation, cuộn) được đọc trong composition nên composable chạy lại mỗi khung hình</td><td>Dùng <code>Modifier.offset { }</code>, <code>graphicsLayer { }</code>, <code>drawBehind { }</code> thay cho <code>offset(x.dp)</code>, <code>alpha(a)</code>, <code>background(color)</code></td></tr>
+        <tr><td>Tránh ghi ngược (backwards write)</td><td>Ghi vào một state ngay sau khi đã đọc nó trong cùng lần composition, gây recompose lặp vô hạn</td><td>Chỉ đổi state trong callback sự kiện (<code>onClick</code>…) hoặc trong effect</td></tr>
+        <tr><td>Không lọc/sắp xếp trong thân composable</td><td><code>filter</code>, <code>sortedBy</code> chạy lại mỗi lần recompose và tạo <code>List</code> mới khiến composable con không được bỏ qua</td><td>Bọc trong <code>remember(list, query) { }</code> hoặc chuyển vào ViewModel</td></tr>
+        <tr><td>Tham số ổn định</td><td>Tham số không ổn định khiến composable khó được bỏ qua</td><td><code>data class</code> chỉ gồm <code>val</code>; <code>@Immutable</code>/<code>@Stable</code> khi bạn chắc chắn; collection bất biến</td></tr>
+      </tbody>
+    </table></div>
+    <p class="code-caption">Ví dụ về ghi ngược: tuyệt đối tránh</p>
+    <pre><code class="language-kotlin">@Composable
+fun BadCounter() {
+    var count by remember { mutableIntStateOf(0) }
+    Text("Đã hiển thị $count lần")   // đọc count
+    count++                          // ghi ngay sau khi đọc: recompose không bao giờ dừng
+}</code></pre>
+
+    <h4>4. Stability và strong skipping, hiểu đơn giản</h4>
+    <p>Khi composable cha chạy lại, Compose xét từng composable con: nếu mọi tham số giống lần trước thì <strong>bỏ qua</strong> (skip) con đó. Để biết tham số "giống" hay không, trình biên dịch Compose phân loại kiểu dữ liệu:</p>
+    <ul>
+      <li><strong>Ổn định</strong> (stable): kiểu nguyên thủy (<code>Int</code>, <code>Boolean</code>…), <code>String</code>, kiểu hàm (lambda), <code>data class</code> chỉ gồm <code>val</code> có kiểu ổn định, class được đánh dấu <code>@Immutable</code> hoặc <code>@Stable</code>.</li>
+      <li><strong>Không ổn định</strong> (unstable): class có thuộc tính <code>var</code> thường, các interface <code>List</code>/<code>Set</code>/<code>Map</code> của Kotlin (vì phía sau có thể là danh sách thay đổi được), class từ module không được biên dịch bằng trình biên dịch Compose.</li>
+    </ul>
+    <p>Từ Kotlin 2.0.20, chế độ <strong>strong skipping</strong> được bật mặc định: composable có tham số không ổn định <em>vẫn</em> có thể được bỏ qua. Tham số ổn định được so sánh bằng <code>equals</code> (giá trị bằng nhau là đủ), còn tham số không ổn định được so sánh bằng tham chiếu (phải đúng cùng một đối tượng). Lambda trong composable cũng được tự động <code>remember</code>. Hệ quả thực tế: nếu mỗi lần recompose bạn tạo một <code>List</code> mới bằng <code>filter</code>, dù nội dung giống hệt thì tham chiếu vẫn khác, nên composable con vẫn phải chạy lại.</p>
+    <p>Muốn biết hàm nào bỏ qua được và tham số nào không ổn định, bật <em>báo cáo trình biên dịch Compose</em> (compiler reports/metrics) trong block <code>composeCompiler { }</code> của Gradle. Cũng trong block đó, bạn có thể khai báo một <em>file cấu hình ổn định</em> (stability configuration file) để coi các class từ thư viện bên ngoài là ổn định. Với danh sách, có thể dùng <code>ImmutableList</code> của thư viện <code>kotlinx-collections-immutable</code>.</p>
+
+    <h4>5. Công cụ đo</h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Công cụ</th><th>Dùng để</th></tr></thead>
+      <tbody>
+        <tr><td>Layout Inspector (Android Studio)</td><td>Xem số lần recompose và số lần bỏ qua của từng composable khi app đang chạy</td></tr>
+        <tr><td>Composition tracing</td><td>Hiện tên composable trong System Trace (Android Studio Profiler, Perfetto) để biết khung hình chậm do đâu</td></tr>
+        <tr><td>Compose compiler reports</td><td>Liệt kê hàm skippable/restartable và tham số không ổn định</td></tr>
+        <tr><td>Macrobenchmark</td><td>Đo thời gian khởi động (<code>StartupTimingMetric</code>) và độ mượt khung hình (<code>FrameTimingMetric</code>) trên bản release, lặp nhiều lần cho kết quả tin cậy; đồng thời dùng để tạo Baseline Profile</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+
+    <h4>Ví dụ 1: Lọc danh sách, trước và sau</h4>
+    <p class="code-caption">Trước: lọc và sắp xếp lại toàn bộ danh bạ mỗi lần composable chạy lại</p>
+    <pre><code class="language-kotlin">data class Contact(val id: Long, val name: String, val phone: String)
+
+@Composable
+fun ContactList(contacts: List&lt;Contact&gt;, query: String) {
+    val visible = contacts
+        .filter { it.name.contains(query, ignoreCase = true) }
+        .sortedBy { it.name }
+    LazyColumn {
+        items(visible) { contact -&gt; ContactRow(contact) }
+    }
+}</code></pre>
+    <p class="code-caption">Sau (cách A): chỉ tính lại khi <code>contacts</code> hoặc <code>query</code> đổi, thêm <code>key</code> cho item</p>
+    <pre><code class="language-kotlin">@Composable
+fun ContactList(contacts: List&lt;Contact&gt;, query: String) {
+    val visible = remember(contacts, query) {
+        contacts
+            .filter { it.name.contains(query, ignoreCase = true) }
+            .sortedBy { it.name }
+    }
+    LazyColumn {
+        items(visible, key = { it.id }) { contact -&gt; ContactRow(contact) }
+    }
+}</code></pre>
+    <p class="code-caption">Sau (cách B, tốt hơn cho danh sách lớn): đưa việc lọc vào ViewModel, chạy ngoài luồng chính</p>
+    <pre><code class="language-kotlin">class ContactsViewModel(repository: ContactRepository) : ViewModel() {
+    private val query = MutableStateFlow("")
+
+    val visibleContacts: StateFlow&lt;List&lt;Contact&gt;&gt; =
+        combine(repository.contacts, query) { list, q -&gt;
+            list.filter { it.name.contains(q, ignoreCase = true) }.sortedBy { it.name }
+        }
+            .flowOn(Dispatchers.Default)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun onQueryChange(newQuery: String) {
+        query.value = newQuery
+    }
+}
+
+@Composable
+fun ContactsRoute(viewModel: ContactsViewModel) {
+    val contacts by viewModel.visibleContacts.collectAsStateWithLifecycle()
+    LazyColumn {
+        items(contacts, key = { it.id }) { contact -&gt; ContactRow(contact) }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Giao diện không đổi, nhưng khi màn hình recompose vì lý do khác (vd mở menu), danh bạ không bị lọc lại. Ở cách B, thao tác nặng chạy trên <code>Dispatchers.Default</code> nên ô tìm kiếm vẫn gõ mượt với hàng nghìn liên hệ. (<code>repository.contacts</code> là một <code>Flow&lt;List&lt;Contact&gt;&gt;</code>; xem <a href="#viewmodel">ViewModel</a>.)</p>
+
+    <h4>Ví dụ 2: Nút "Lên đầu" với <code>derivedStateOf</code></h4>
+    <pre><code class="language-kotlin">@Composable
+fun ArticleFeed(titles: List&lt;String&gt;) {
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+
+    // Sai: val showButton = listState.firstVisibleItemIndex &gt; 3
+    // làm ArticleFeed chạy lại mỗi khi cuộn qua một item.
+    val showButton by remember {
+        derivedStateOf { listState.firstVisibleItemIndex &gt; 3 }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(state = listState) {
+            items(titles) { title -&gt;
+                Text(title, Modifier.fillMaxWidth().padding(16.dp))
+            }
+        }
+        AnimatedVisibility(
+            visible = showButton,
+            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
+        ) {
+            ExtendedFloatingActionButton(
+                onClick = { scope.launch { listState.animateScrollToItem(0) } }
+            ) {
+                Text("Lên đầu")
+            }
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Khi cuộn qua item thứ 4, nút "Lên đầu" trượt hiện ra ở góc dưới phải; bấm vào thì danh sách cuộn mượt về đầu và nút ẩn đi. Trong Layout Inspector, <code>ArticleFeed</code> chỉ recompose khi nút đổi trạng thái hiện/ẩn, không phải với từng item cuộn qua.</p>
+
+    <h4>Ví dụ 3: Màu nền nhấp nháy, vẽ bằng <code>drawBehind</code></h4>
+    <pre><code class="language-kotlin">@Composable
+fun LiveBadge(text: String) {
+    val transition = rememberInfiniteTransition(label = "nhap_nhay")
+    val bgColor by transition.animateColor(
+        initialValue = Color(0xFFD32F2F),
+        targetValue = Color(0xFFFF8A80),
+        animationSpec = infiniteRepeatable(tween(800), RepeatMode.Reverse),
+        label = "mau_nen"
+    )
+
+    // Trước: Modifier.background(bgColor, RoundedCornerShape(8.dp))
+    // đọc màu trong composition nên LiveBadge chạy lại mỗi khung hình.
+    Text(
+        text = text,
+        color = Color.White,
+        modifier = Modifier
+            .drawBehind {
+                // Màu chỉ được đọc ở giai đoạn vẽ
+                drawRoundRect(color = bgColor, cornerRadius = CornerRadius(8.dp.toPx()))
+            }
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+    )
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Nhãn "TRỰC TIẾP" (khi gọi <code>LiveBadge("TRỰC TIẾP")</code>) có nền đỏ chuyển qua lại giữa đậm và nhạt. Với <code>background</code>, Layout Inspector cho thấy số lần recompose tăng liên tục; với <code>drawBehind</code>, số lần recompose đứng yên vì chỉ giai đoạn vẽ chạy lại.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li>Đừng tối ưu khi chưa đo. Code dễ đọc quan trọng hơn vài micro giây; chỉ sửa chỗ công cụ chỉ ra là chậm.</li>
+      <li>Đếm số lần recompose bằng Layout Inspector trên bản debug là được, nhưng <strong>đo thời gian</strong> (khởi động, độ giật) phải làm trên bản release, tốt nhất trên thiết bị thật.</li>
+      <li><code>@Immutable</code> và <code>@Stable</code> là <em>lời hứa</em> với trình biên dịch. Đánh dấu một class mà thực tế vẫn bị sửa bên trong sẽ khiến UI không cập nhật như mong đợi.</li>
+      <li><code>derivedStateOf</code> chỉ có ích khi kết quả đổi <em>ít hơn</em> state đầu vào. Nếu kết quả đổi theo từng lần input đổi (vd ghép họ và tên), chỉ cần <code>remember(key)</code> hoặc tính trực tiếp.</li>
+      <li>Với giá trị đổi liên tục, có thể truyền lambda (<code>() -&gt; Float</code>) cho composable con thay vì truyền giá trị, để con tự đọc ở giai đoạn layout hoặc vẽ.</li>
+      <li>Luôn đặt <code>key</code> ổn định cho item trong lazy list có thể thêm, xóa hoặc đổi thứ tự.</li>
+    </ul>
+    <div class="callout warn"><strong>Cảnh báo:</strong> Đừng tự kết luận "Compose chậm" sau khi chạy bản debug trên emulator. Hãy so sánh trên bản release có R8 và Baseline Profile trước khi quyết định viết lại bất cứ thứ gì.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/performance?hl=vi" target="_blank" rel="noopener">Hiệu suất của Compose</a></p>
+</section>

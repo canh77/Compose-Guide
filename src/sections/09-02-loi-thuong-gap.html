@@ -1,0 +1,123 @@
+<section class="topic" id="loi-thuong-gap" data-title="Lỗi thường gặp">
+  <h2>Lỗi thường gặp của người mới học Compose</h2>
+  <p class="lead">Phần lớn lỗi của người mới không nằm ở cú pháp mà ở thói quen nghĩ theo kiểu View cũ. Bảng dưới đây gom các triệu chứng hay gặp nhất, nguyên nhân và cách sửa.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p>Với View/XML, bạn tạo một đối tượng giao diện rồi gọi hàm để <em>thay đổi</em> nó (<code>textView.setText(...)</code>). Compose thì ngược lại: bạn mô tả giao diện <em>từ dữ liệu</em>, và Compose tự vẽ lại khi dữ liệu (state) đổi. Khi đầu óc vẫn nghĩ theo kiểu "ra lệnh cho view", ta dễ viết code biên dịch được nhưng chạy sai: bấm nút không có gì xảy ra, dữ liệu mất khi xoay màn hình, hàm bị gọi lặp vô hạn.</p>
+    <p>Mục này là "bảng tra lỗi": mỗi dòng gồm triệu chứng bạn nhìn thấy, nguyên nhân gốc và cách sửa, kèm liên kết tới chủ đề giải thích chi tiết.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <p>Tìm dòng có triệu chứng giống lỗi của bạn, đọc nguyên nhân, rồi mở chủ đề liên quan để hiểu tận gốc thay vì chỉ sửa cho chạy.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Triệu chứng</th><th>Nguyên nhân</th><th>Cách sửa</th></tr></thead>
+      <tbody>
+        <tr><td>Bấm nút nhưng số/chữ trên màn hình không đổi</td><td>Dùng biến thường <code>var count = 0</code>, hoặc <code>mutableStateOf</code> mà thiếu <code>remember</code></td><td><code>var count by remember { mutableStateOf(0) }</code> · <a href="#state-remember">State &amp; remember</a></td></tr>
+        <tr><td>Thêm phần tử vào danh sách nhưng UI không cập nhật</td><td>Sửa <code>ArrayList</code> bằng <code>add()</code>; Compose không theo dõi được</td><td>Dùng <code>mutableStateListOf()</code> hoặc gán danh sách mới · <a href="#state-remember">State &amp; remember</a></td></tr>
+        <tr><td>Xoay màn hình là mất dữ liệu đã nhập</td><td><code>remember</code> chỉ sống qua recomposition, không qua việc tạo lại Activity</td><td><code>rememberSaveable</code> hoặc ViewModel · <a href="#luu-trang-thai">Lưu trạng thái</a></td></tr>
+        <tr><td>Nội dung bị che dưới thanh trạng thái hoặc thanh điều hướng</td><td>Bỏ qua <code>innerPadding</code> của Scaffold hoặc không xử lý insets</td><td>Áp <code>Modifier.padding(innerPadding)</code> · <a href="#scaffold">Scaffold</a>, <a href="#edge-to-edge">Tràn viền</a></td></tr>
+        <tr><td>Crash: "Vertically scrollable component was measured with an infinity maximum height constraints"</td><td>Đặt <code>LazyColumn</code> bên trong <code>Column</code> có <code>verticalScroll</code></td><td>Bỏ cuộn ở ngoài; đưa phần đầu trang thành <code>item { }</code> của LazyColumn · <a href="#lazy-list">LazyColumn</a></td></tr>
+        <tr><td>Lỗi biên dịch "@Composable invocations can only happen from the context of a @Composable function"</td><td>Gọi composable (vd <code>AlertDialog</code>) bên trong <code>onClick</code> hoặc hàm thường</td><td>Dùng state để điều khiển việc hiển thị · <a href="#ham-composable">Hàm @Composable</a></td></tr>
+        <tr><td>Lỗi biên dịch khi gọi hàm <code>suspend</code> trong <code>onClick</code></td><td><code>onClick</code> là lambda thường, không phải coroutine</td><td><code>val scope = rememberCoroutineScope()</code> rồi <code>scope.launch { … }</code> · <a href="#side-effects">Side effects</a></td></tr>
+        <tr><td>Gọi API hoặc ghi log liên tục, app nóng máy</td><td>Đặt việc có tác dụng phụ trực tiếp trong thân composable, chạy lại mỗi lần recompose</td><td>Chuyển vào <code>LaunchedEffect</code> hoặc ViewModel · <a href="#side-effects">Side effects</a></td></tr>
+        <tr><td>Xóa hoặc sắp xếp danh sách thì ô đang mở rộng/đã nhập "nhảy" sang item khác</td><td>Thiếu <code>key</code> trong <code>items()</code></td><td><code>items(list, key = { it.id })</code> · <a href="#lazy-list">LazyColumn</a></td></tr>
+        <tr><td>Vùng bấm nhỏ hơn mong đợi hoặc nền không phủ hết</td><td>Thứ tự modifier sai (vd <code>padding</code> đứng trước <code>clickable</code>)</td><td>Đọc chuỗi modifier từ trái sang phải · <a href="#modifier">Modifier</a></td></tr>
+        <tr><td>Preview trắng hoặc báo lỗi</td><td>Preview gọi composable cần ViewModel, Hilt, database</td><td>Preview phiên bản stateless nhận dữ liệu giả · <a href="#preview">@Preview</a></td></tr>
+        <tr><td>Bật dark mode nhưng chữ đen trên nền đen</td><td>Hardcode <code>Color.Black</code>, <code>Color.White</code></td><td>Dùng <code>MaterialTheme.colorScheme</code> · <a href="#material3">Material 3</a></td></tr>
+        <tr><td>Build lỗi liên quan Compose Compiler</td><td>Version plugin <code>org.jetbrains.kotlin.plugin.compose</code> khác version Kotlin, hoặc quên <code>buildFeatures { compose = true }</code></td><td>Đồng bộ version · <a href="#thiet-lap-du-an">Thiết lập dự án</a></td></tr>
+        <tr><td>Danh sách giật khi chạy thử</td><td>Đo trên bản debug (luôn chậm hơn nhiều), hoặc sắp xếp/lọc dữ liệu trong composable</td><td>Đo trên bản release, chuyển xử lý vào <code>remember</code>/ViewModel · <a href="#performance">Hiệu suất</a></td></tr>
+        <tr><td>Chữ bị cắt khi người dùng tăng cỡ chữ hệ thống</td><td>Cố định <code>height</code> cho vùng chứa chữ</td><td>Dùng <code>heightIn(min = …)</code>, để chữ tự xuống dòng · <a href="#accessibility">Hỗ trợ tiếp cận</a></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>1. Hiện hộp thoại khi bấm nút</h4>
+    <p class="code-caption">Sai: gọi composable bên trong onClick (không biên dịch được)</p>
+    <pre><code class="language-kotlin">Button(onClick = {
+    AlertDialog(onDismissRequest = {}, confirmButton = {}) // Lỗi biên dịch
+}) {
+    Text("Xóa ghi chú")
+}</code></pre>
+    <p class="code-caption">Đúng: onClick chỉ đổi state, còn việc hiển thị phụ thuộc vào state</p>
+    <pre><code class="language-kotlin">@Composable
+fun DeleteNoteButton(onConfirmDelete: () -> Unit) {
+    var showDialog by remember { mutableStateOf(false) }
+
+    Button(onClick = { showDialog = true }) {
+        Text("Xóa ghi chú")
+    }
+
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            title = { Text("Xóa ghi chú này?") },
+            text = { Text("Bạn sẽ không khôi phục lại được.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDialog = false
+                    onConfirmDelete()
+                }) { Text("Xóa") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDialog = false }) { Text("Hủy") }
+            }
+        )
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> bấm "Xóa ghi chú" thì hộp thoại hiện ra; bấm "Hủy" hoặc chạm ra ngoài thì hộp thoại đóng, bấm "Xóa" thì gọi <code>onConfirmDelete</code>.</p>
+
+    <h4>2. Danh sách có phần đầu trang</h4>
+    <p class="code-caption">Sai: LazyColumn nằm trong Column có verticalScroll (crash lúc chạy)</p>
+    <pre><code class="language-kotlin">Column(Modifier.verticalScroll(rememberScrollState())) {
+    ProfileHeader()
+    LazyColumn {
+        items(posts) { post -> PostRow(post) }
+    }
+}</code></pre>
+    <p class="code-caption">Đúng: chỉ một vùng cuộn, phần đầu trang là một item</p>
+    <pre><code class="language-kotlin">@Composable
+fun ProfileFeed(posts: List&lt;Post&gt;, modifier: Modifier = Modifier) {
+    LazyColumn(modifier = modifier) {
+        item { ProfileHeader() }
+        items(posts, key = { it.id }) { post ->
+            PostRow(post)
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> phần đầu trang cuộn cùng danh sách, và chỉ những bài viết đang hiển thị mới được dựng nên cuộn mượt.</p>
+
+    <h4>3. Gọi hàm suspend khi bấm nút</h4>
+    <pre><code class="language-kotlin">@Composable
+fun SaveButton(snackbarHostState: SnackbarHostState, onSave: suspend () -> Unit) {
+    val scope = rememberCoroutineScope()
+
+    Button(onClick = {
+        scope.launch {
+            onSave()
+            snackbarHostState.showSnackbar("Đã lưu")
+        }
+    }) {
+        Text("Lưu")
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> bấm "Lưu" thì việc lưu chạy trong coroutine gắn với vòng đời màn hình, xong thì hiện Snackbar "Đã lưu". Nếu người dùng rời màn hình, coroutine tự bị hủy.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li>Đọc kỹ thông báo lỗi trước khi tìm cách khác: thông báo của Compose thường nói đúng nguyên nhân, như hai lỗi về <code>@Composable invocations</code> và <code>infinity maximum height</code> ở trên.</li>
+      <li>Android Studio có sẵn các kiểm tra lint cho Compose, sẽ gạch vàng nhiều lỗi trong bảng như thiếu <code>remember</code>, sai thứ tự tham số <code>modifier</code> hay lambda không ổn định. Đừng bỏ qua cảnh báo vàng.</li>
+      <li>Khi một màn hình phức tạp chạy sai, hãy tách phần nghi ngờ thành composable nhỏ có <code>@Preview</code> riêng để khoanh vùng lỗi.</li>
+      <li>Dùng Layout Inspector để xem cây giao diện, kích thước thực tế và số lần mỗi composable bị recompose. Con số tăng liên tục là dấu hiệu đọc state sai chỗ.</li>
+      <li>Thử xoay màn hình, bật dark mode, tăng cỡ chữ lên tối đa và đổi sang tiếng Ả Rập (RTL) với mỗi màn hình mới. Bốn bước này phát hiện được rất nhiều lỗi trước khi người dùng thấy.</li>
+    </ul>
+    <div class="callout tip"><strong>Mẹo:</strong> khi bí, hãy tự hỏi "dữ liệu nào quyết định màn hình này, và nó đang được lưu ở đâu?". Phần lớn lỗi Compose được giải quyết khi trả lời đúng câu hỏi đó.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/mental-model" target="_blank" rel="noopener">Thinking in Compose</a> · <a href="https://developer.android.com/develop/ui/compose/performance/bestpractices" target="_blank" rel="noopener">Follow best practices</a></p>
+</section>

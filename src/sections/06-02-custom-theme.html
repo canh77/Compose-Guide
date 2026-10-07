@@ -1,0 +1,284 @@
+<section class="topic" id="custom-theme" data-title="Tùy biến theme">
+  <h2>Tùy biến theme: màu thương hiệu, font, dark mode</h2>
+  <p class="lead">Theme mặc định của Material 3 chỉ là điểm khởi đầu. Bài này hướng dẫn thay bằng màu thương hiệu, font riêng và bo góc riêng, thêm token màu của riêng bạn, cho người dùng chọn Sáng/Tối, rồi kiểm tra cả hai chế độ ngay trong Preview.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p><strong>Tùy biến theme</strong> là thay các giá trị trong ba nhóm token của <code>MaterialTheme</code> (xem <a href="#material3">Material 3</a>): <code>ColorScheme</code> (bảng màu), <code>Typography</code> (thang chữ) và <code>Shapes</code> (bo góc). Bạn gom chúng vào một hàm composable riêng, ví dụ <code>AppTheme</code>. Hàm này còn quyết định khi nào dùng bảng màu sáng, khi nào dùng bảng màu tối, và khi nào dùng màu động.</p>
+    <p><strong>Dark mode</strong> (chế độ tối) không chỉ đơn giản là đảo ngược màu. Material 3 có hai bảng màu riêng, được tính từ cùng một màu gốc sao cho cặp nền/chữ luôn đủ tương phản. <strong>Màu động</strong> (dynamic color) có từ Android 12 (API 31): hệ thống tạo bảng màu từ hình nền của người dùng, và app có thể dùng bảng màu đó thay cho màu thương hiệu.</p>
+    <p>Hồi dùng XML, bạn khai báo hai file <code>values/themes.xml</code> và <code>values-night/themes.xml</code>. Trong Compose, cả hai chỉ là hai biến Kotlin, và một câu <code>if</code> chọn biến nào được dùng.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>1. Tạo bảng màu từ màu thương hiệu</h4>
+    <p>Mỗi bảng màu có hơn 30 vai trò. Đừng tự chọn tay từng màu. Hãy dùng công cụ <strong>Material Theme Builder</strong> (bản web hoặc plugin Figma): nhập một màu gốc của thương hiệu, công cụ sẽ sinh đủ mọi vai trò cho cả sáng lẫn tối, rồi xuất ra file <code>Color.kt</code> và <code>Theme.kt</code> cho Jetpack Compose. Dưới đây là một bảng màu đã rút gọn cho quán trà "Lá Xanh":</p>
+    <pre><code class="language-kotlin">// Color.kt
+val Green40 = Color(0xFF2E6A47)
+val Green90 = Color(0xFFB1F1C4)
+val Green10 = Color(0xFF00210F)
+val Green80 = Color(0xFF95D5A9)
+val Green20 = Color(0xFF00391E)
+val Green30 = Color(0xFF125131)
+
+// Theme.kt
+private val LightColors = lightColorScheme(
+    primary = Green40,
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Green90,
+    onPrimaryContainer = Green10,
+    // ... secondary, tertiary, surface... lấy từ Theme Builder
+)
+
+private val DarkColors = darkColorScheme(
+    primary = Green80,
+    onPrimary = Green20,
+    primaryContainer = Green30,
+    onPrimaryContainer = Green90,
+    // ...
+)</code></pre>
+    <div class="callout warn"><strong>Cảnh báo:</strong> Vai trò nào bạn không truyền vào <code>lightColorScheme</code>/<code>darkColorScheme</code> sẽ giữ màu mặc định (tông tím) của Material 3. Nếu chỉ đặt <code>primary</code>, app sẽ là màu xanh pha tím. Đó là lý do nên sinh đủ bảng màu bằng Theme Builder.</div>
+
+    <h4>2. Hàm AppTheme chọn bảng màu</h4>
+    <pre><code class="language-kotlin">@Composable
+fun AppTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    dynamicColor: Boolean = true,
+    content: @Composable () -&gt; Unit
+) {
+    val colorScheme = when {
+        dynamicColor &amp;&amp; Build.VERSION.SDK_INT &gt;= Build.VERSION_CODES.S -&gt; {
+            val context = LocalContext.current
+            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        }
+        darkTheme -&gt; DarkColors
+        else -&gt; LightColors
+    }
+    MaterialTheme(
+        colorScheme = colorScheme,
+        typography = AppTypography,
+        shapes = AppShapes,
+        content = content
+    )
+}</code></pre>
+    <p>Trên Android 12 trở lên, nếu <code>dynamicColor = true</code>, app sẽ dùng màu lấy từ hình nền. Máy cũ hơn, hoặc khi bạn tắt cờ này, sẽ dùng bảng màu thương hiệu.</p>
+
+    <h4>3. Font tùy chỉnh</h4>
+    <p>Chép các file font (<code>.ttf</code>/<code>.otf</code>) vào <code>res/font/</code>. Tên file chỉ được có chữ thường, số và dấu gạch dưới. Sau đó khai báo một <code>FontFamily</code> và áp dụng vào các kiểu chữ cần đổi:</p>
+    <pre><code class="language-kotlin">// Type.kt
+val BeVietnamPro = FontFamily(
+    Font(R.font.be_vietnam_pro_regular, FontWeight.Normal),
+    Font(R.font.be_vietnam_pro_medium, FontWeight.Medium),
+    Font(R.font.be_vietnam_pro_bold, FontWeight.Bold),
+)
+
+private val base = Typography()
+
+// Tiêu đề dùng font thương hiệu, phần thân giữ font mặc định
+val AppTypography = Typography(
+    displayLarge = base.displayLarge.copy(fontFamily = BeVietnamPro),
+    displayMedium = base.displayMedium.copy(fontFamily = BeVietnamPro),
+    displaySmall = base.displaySmall.copy(fontFamily = BeVietnamPro),
+    headlineLarge = base.headlineLarge.copy(fontFamily = BeVietnamPro),
+    headlineMedium = base.headlineMedium.copy(fontFamily = BeVietnamPro),
+    headlineSmall = base.headlineSmall.copy(fontFamily = BeVietnamPro),
+    titleLarge = base.titleLarge.copy(fontFamily = BeVietnamPro, fontWeight = FontWeight.Bold),
+    titleMedium = base.titleMedium.copy(fontFamily = BeVietnamPro),
+    titleSmall = base.titleSmall.copy(fontFamily = BeVietnamPro),
+)</code></pre>
+
+    <h4>4. Shapes tùy chỉnh</h4>
+    <pre><code class="language-kotlin">// Bo tròn hơn mặc định cho cảm giác mềm mại
+val AppShapes = Shapes(
+    extraSmall = RoundedCornerShape(6.dp),
+    small = RoundedCornerShape(10.dp),
+    medium = RoundedCornerShape(16.dp),
+    large = RoundedCornerShape(24.dp),
+    extraLarge = RoundedCornerShape(32.dp),
+)</code></pre>
+
+    <h4>5. Thêm token riêng (extended colors)</h4>
+    <p><code>ColorScheme</code> không có sẵn vai trò "cảnh báo" hay "thành công". Để thêm, bạn tạo một <code>data class</code>, cung cấp nó qua <code>staticCompositionLocalOf</code> (xem <a href="#compositionlocal">CompositionLocal</a>) và tạo một <code>object AppTheme</code> để truy cập cho gọn, giống cách <code>MaterialTheme</code> vừa là hàm vừa là object.</p>
+    <pre><code class="language-kotlin">@Immutable
+data class ExtendedColors(
+    val warning: Color,
+    val onWarning: Color,
+    val warningContainer: Color,
+    val onWarningContainer: Color,
+)
+
+val LightExtendedColors = ExtendedColors(
+    warning = Color(0xFF7A5900),
+    onWarning = Color(0xFFFFFFFF),
+    warningContainer = Color(0xFFFFDEA0),
+    onWarningContainer = Color(0xFF261900),
+)
+
+val DarkExtendedColors = ExtendedColors(
+    warning = Color(0xFFF8BD2A),
+    onWarning = Color(0xFF402D00),
+    warningContainer = Color(0xFF5C4200),
+    onWarningContainer = Color(0xFFFFDEA0),
+)
+
+val LocalExtendedColors = staticCompositionLocalOf { LightExtendedColors }
+
+object AppTheme {
+    val extendedColors: ExtendedColors
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalExtendedColors.current
+}</code></pre>
+    <p>Trong hàm <code>AppTheme(...)</code> ở bước 2, bọc <code>MaterialTheme</code> bằng <code>CompositionLocalProvider</code>:</p>
+    <pre><code class="language-kotlin">val extended = if (darkTheme) DarkExtendedColors else LightExtendedColors
+CompositionLocalProvider(LocalExtendedColors provides extended) {
+    MaterialTheme(colorScheme = colorScheme, typography = AppTypography, shapes = AppShapes, content = content)
+}</code></pre>
+
+    <h4>6. Lưu lựa chọn Sáng/Tối/Theo hệ thống</h4>
+    <p>Cho người dùng chọn một trong ba chế độ và lưu lựa chọn lại, thường bằng DataStore (thư viện <code>androidx.datastore:datastore-preferences</code>). Sau đó đổi lựa chọn thành giá trị <code>darkTheme</code> và truyền vào <code>AppTheme</code>.</p>
+    <pre><code class="language-kotlin">enum class ThemeMode(val label: String) { LIGHT("Sáng"), DARK("Tối"), SYSTEM("Theo hệ thống") }
+
+private val Context.settingsStore by preferencesDataStore(name = "settings")
+private val THEME_MODE = stringPreferencesKey("theme_mode")
+
+class SettingsRepository(private val context: Context) {
+    val themeMode: Flow&lt;ThemeMode&gt; = context.settingsStore.data.map { prefs -&gt;
+        ThemeMode.entries.firstOrNull { it.name == prefs[THEME_MODE] } ?: ThemeMode.SYSTEM
+    }
+
+    suspend fun setThemeMode(mode: ThemeMode) {
+        context.settingsStore.edit { prefs -&gt; prefs[THEME_MODE] = mode.name }
+    }
+}</code></pre>
+
+    <h4>7. Màu thanh hệ thống và Preview</h4>
+    <ul>
+      <li>Gọi <code>enableEdgeToEdge()</code> trong <code>onCreate</code> thì thanh trạng thái và thanh điều hướng sẽ trong suốt, và icon trên đó tự sáng/tối theo chế độ của <em>hệ thống</em> (xem <a href="#edge-to-edge">Edge-to-edge</a>). Nếu app cho phép chọn chế độ khác với hệ thống, hãy gọi lại hàm này với <code>SystemBarStyle</code> phù hợp, như trong Ví dụ 2.</li>
+      <li>Thêm <code>@PreviewLightDark</code> lên hàm preview để Android Studio vẽ một bản sáng và một bản tối cạnh nhau.</li>
+    </ul>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>Ví dụ 1: Banner "sắp hết hàng" dùng token mở rộng</h4>
+    <pre><code class="language-kotlin">@Composable
+fun LowStockBanner(itemName: String, remaining: Int, modifier: Modifier = Modifier) {
+    val colors = AppTheme.extendedColors
+    Surface(
+        color = colors.warningContainer,
+        contentColor = colors.onWarningContainer, // contentColorFor() không biết màu tự thêm
+        shape = MaterialTheme.shapes.medium,
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(painterResource(R.drawable.ic_warning), contentDescription = null)
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text("Sắp hết hàng", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "$itemName chỉ còn $remaining phần",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun LowStockBannerPreview() {
+    AppTheme(dynamicColor = false) {
+        Surface {
+            LowStockBanner("Trà ô long", remaining = 3, modifier = Modifier.padding(16.dp))
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Preview hiện hai bản. Bản sáng có banner nền vàng nhạt, chữ nâu sẫm. Bản tối có nền vàng nâu đậm, chữ vàng nhạt. Tiêu đề "Sắp hết hàng" dùng font Be Vietnam Pro của theme, và góc bo 16.dp lấy từ <code>AppShapes.medium</code>.</p>
+
+    <h4>Ví dụ 2: Màn cài đặt chọn chế độ giao diện</h4>
+    <pre><code class="language-kotlin">@Composable
+fun ThemeModePicker(
+    selected: ThemeMode,
+    onSelect: (ThemeMode) -&gt; Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier.selectableGroup()) {
+        Text(
+            "Giao diện",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(16.dp)
+        )
+        ThemeMode.entries.forEach { mode -&gt;
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .selectable(
+                        selected = mode == selected,
+                        onClick = { onSelect(mode) },
+                        role = Role.RadioButton
+                    )
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RadioButton(selected = mode == selected, onClick = null)
+                Spacer(Modifier.width(16.dp))
+                Text(mode.label, style = MaterialTheme.typography.bodyLarge)
+            }
+        }
+    }
+}
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContent {
+            // Bản demo: giữ lựa chọn qua lần xoay màn hình.
+            // App thật: đọc/ghi qua SettingsRepository trong ViewModel.
+            var themeMode by rememberSaveable { mutableStateOf(ThemeMode.SYSTEM) }
+            val darkTheme = when (themeMode) {
+                ThemeMode.LIGHT -&gt; false
+                ThemeMode.DARK -&gt; true
+                ThemeMode.SYSTEM -&gt; isSystemInDarkTheme()
+            }
+
+            // Icon thanh hệ thống theo lựa chọn trong app, không theo hệ thống
+            LaunchedEffect(darkTheme) {
+                val transparent = android.graphics.Color.TRANSPARENT
+                enableEdgeToEdge(
+                    statusBarStyle = SystemBarStyle.auto(transparent, transparent) { darkTheme },
+                    navigationBarStyle = SystemBarStyle.auto(transparent, transparent) { darkTheme },
+                )
+            }
+
+            AppTheme(darkTheme = darkTheme) {
+                Scaffold { innerPadding -&gt;
+                    ThemeModePicker(
+                        selected = themeMode,
+                        onSelect = { themeMode = it },
+                        modifier = Modifier.padding(innerPadding)
+                    )
+                }
+            }
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Màn hình có ba lựa chọn dạng radio. Chọn "Tối" thì cả app chuyển sang nền tối ngay lập tức, kể cả khi điện thoại đang ở chế độ sáng, và icon trên thanh trạng thái đổi sang màu sáng cho dễ nhìn. Chọn "Theo hệ thống" thì app đi theo cài đặt của máy.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li><strong>Đừng gõ cứng <code>Color.White</code>/<code>Color.Black</code> trong giao diện.</strong> Chữ đen trên nền tối sẽ biến mất. Mã màu chỉ nên xuất hiện trong <code>Color.kt</code>, còn ở mọi chỗ khác hãy đọc qua <code>MaterialTheme.colorScheme</code> hoặc <code>AppTheme.extendedColors</code>.</li>
+      <li><strong>Kiểm tra độ tương phản:</strong> chữ thường cần tỉ lệ tương phản tối thiểu 4.5:1 so với nền, chữ lớn cần 3:1. Cặp <code>xxx</code>/<code>onXxx</code> do Theme Builder sinh ra thường đã đạt mức này. Rủi ro nằm ở những màu bạn tự chỉnh tay hoặc ghép sai cặp, nên hãy kiểm tra lại bằng công cụ đo tương phản.</li>
+      <li><strong>Màu động sẽ thay màu thương hiệu:</strong> khi <code>dynamicColor = true</code>, nút chính có thể thành màu hồng hay xanh dương tùy hình nền. Nếu nhận diện thương hiệu quan trọng, đặt mặc định <code>false</code> hoặc cho người dùng tự bật. Token tự thêm như <code>warning</code> sẽ không đổi theo hình nền.</li>
+      <li><strong>Preview:</strong> dùng <code>AppTheme(dynamicColor = false)</code> trong Preview để thấy đúng màu thương hiệu, và dùng <code>@PreviewLightDark</code> để phát hiện sớm lỗi ở chế độ tối.</li>
+      <li><strong>Font tiếng Việt:</strong> chọn font hỗ trợ đầy đủ dấu tiếng Việt, ví dụ Be Vietnam Pro hay Inter. Font thiếu ký tự có dấu sẽ bị hệ thống thay bằng font khác ngay giữa chữ, trông rất lệch.</li>
+      <li><code>staticCompositionLocalOf</code> hợp với dữ liệu hiếm khi đổi như màu theme. Khi giá trị đổi (chuyển sáng/tối), cả cây giao diện bên dưới sẽ được vẽ lại, và điều đó chấp nhận được với theme.</li>
+    </ul>
+    <div class="callout info"><strong>Lưu ý:</strong> <code>isSystemInDarkTheme()</code> chỉ đọc cài đặt của máy. Muốn app có lựa chọn riêng thì phải tự lưu lựa chọn và truyền <code>darkTheme</code> vào theme, như Ví dụ 2.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/designsystems/material3?hl=vi" target="_blank" rel="noopener">Material Design 3 trong Compose (màu, kiểu chữ, hình dạng)</a></p>
+</section>

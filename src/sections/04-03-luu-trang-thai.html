@@ -1,0 +1,229 @@
+<section class="topic" id="luu-trang-thai" data-title="Lưu trạng thái">
+  <h2>Lưu trạng thái giao diện qua xoay màn hình và process death</h2>
+  <p class="lead">Người dùng xoay máy, đổi ngôn ngữ hay chuyển sang app khác một lúc rồi quay lại, và họ mong thấy mọi thứ vẫn y như cũ. Chủ đề này giải thích vì sao state có thể biến mất và chọn công cụ nào (<code>rememberSaveable</code>, ViewModel, <code>SavedStateHandle</code>, lưu trữ bền) để giữ nó.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p><strong>Configuration change</strong> (thay đổi cấu hình) xảy ra khi đặc điểm của thiết bị đổi: xoay màn hình, đổi ngôn ngữ, bật/tắt chế độ tối, đổi cỡ chữ hệ thống, gập/mở máy gập, thay đổi kích thước cửa sổ khi chia đôi màn hình. Mặc định Android hủy Activity và tạo lại cái mới để nạp tài nguyên phù hợp. Toàn bộ composition bị dựng lại từ đầu, nên mọi giá trị chỉ được giữ bằng <code>remember</code> đều mất.</p>
+    <p><strong>Process death</strong> (tiến trình bị kết thúc) xảy ra khi app đang ở nền và hệ thống cần thu hồi bộ nhớ: Android kết thúc cả tiến trình của app. Khi người dùng quay lại từ màn hình đa nhiệm (Recents), Android tạo lại Activity và trả lại <em>saved instance state</em>, một gói dữ liệu nhỏ (<code>Bundle</code>) mà app đã lưu trước khi bị kết thúc. Mọi thứ chỉ nằm trong bộ nhớ, kể cả ViewModel, đều đã mất.</p>
+    <p>Người dùng không hề biết app vừa bị kết thúc ngầm, nên với họ, việc mất chữ đang gõ hay bị đưa về tab đầu tiên là một lỗi. Vì thế cần chủ động chọn cách lưu cho từng loại state.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>Chọn công cụ phù hợp</h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Cách lưu</th><th>Qua recomposition</th><th>Qua xoay màn hình</th><th>Qua process death</th><th>Phạm vi, dùng cho</th></tr></thead>
+      <tbody>
+        <tr><td><code>remember</code></td><td>Có</td><td>Không</td><td>Không</td><td>Một composable; đối tượng tạm, kết quả tính toán</td></tr>
+        <tr><td><code>rememberSaveable</code></td><td>Có</td><td>Có</td><td>Có</td><td>Một composable; state giao diện nhỏ (tab đang chọn, ô nhập, mục đang mở)</td></tr>
+        <tr><td>ViewModel</td><td>Có</td><td>Có</td><td>Không</td><td>Một màn hình; dữ liệu đã tải, logic màn hình</td></tr>
+        <tr><td>ViewModel + <code>SavedStateHandle</code></td><td>Có</td><td>Có</td><td>Có</td><td>Một màn hình; giá trị nhỏ cần khôi phục (id, bộ lọc, bước hiện tại)</td></tr>
+        <tr><td>Lưu trữ bền: DataStore, Room</td><td>Có</td><td>Có</td><td>Có</td><td>Toàn app; dữ liệu cần giữ cả khi người dùng tắt hẳn app hay khởi động lại máy</td></tr>
+      </tbody>
+    </table></div>
+    <p>Saved instance state (dùng bởi <code>rememberSaveable</code> và <code>SavedStateHandle</code>) bị xóa khi người dùng <em>chủ động</em> thoát: nhấn Back thoát khỏi Activity hoặc vuốt app khỏi Recents. Dữ liệu cần giữ lâu dài phải lưu vào DataStore hoặc Room.</p>
+
+    <h4>rememberSaveable với kiểu cơ bản</h4>
+    <p>Dùng y như <code>remember</code>. Giá trị được ghi vào <code>Bundle</code>, nên phải là kiểu Bundle chứa được: số, <code>Boolean</code>, <code>String</code>, mảng nguyên thủy, <code>Parcelable</code>, <code>Serializable</code>...</p>
+    <pre><code class="language-kotlin">var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+var isExpanded by rememberSaveable { mutableStateOf(false) }</code></pre>
+
+    <h4>Đối tượng tự định nghĩa: @Parcelize</h4>
+    <p>Bật plugin <code>kotlin-parcelize</code>, sau đó đánh dấu data class bằng <code>@Parcelize</code> và cho nó kế thừa <code>Parcelable</code>; trình biên dịch tự sinh code đóng gói.</p>
+    <pre><code class="language-kotlin">// build.gradle.kts của module app
+plugins {
+    // ... các plugin sẵn có
+    id("kotlin-parcelize")
+}</code></pre>
+    <pre><code class="language-kotlin">import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
+
+@Parcelize
+data class City(val name: String, val country: String) : Parcelable
+
+// Trong composable
+var city by rememberSaveable { mutableStateOf(City("Đà Nẵng", "Việt Nam")) }</code></pre>
+
+    <h4>Không dùng Parcelable: listSaver và mapSaver</h4>
+    <p>Khi không thể (hoặc không muốn) sửa class, hãy mô tả cách "tách" đối tượng thành các giá trị đơn giản và "ghép" lại:</p>
+    <pre><code class="language-kotlin">data class PriceFilter(val keyword: String, val maxPrice: Int)
+
+val PriceFilterSaver = listSaver&lt;PriceFilter, Any&gt;(
+    save = { listOf(it.keyword, it.maxPrice) },
+    restore = { PriceFilter(keyword = it[0] as String, maxPrice = it[1] as Int) }
+)
+
+// Cùng ý tưởng nhưng đặt tên cho từng giá trị
+val PriceFilterMapSaver = mapSaver&lt;PriceFilter&gt;(
+    save = { mapOf("keyword" to it.keyword, "maxPrice" to it.maxPrice) },
+    restore = { PriceFilter(it["keyword"] as String, it["maxPrice"] as Int) }
+)
+
+// Saver áp cho giá trị bên trong MutableState thì truyền qua stateSaver
+var filter by rememberSaveable(stateSaver = PriceFilterSaver) {
+    mutableStateOf(PriceFilter(keyword = "", maxPrice = 500_000))
+}</code></pre>
+
+    <h4>Saver tùy chỉnh cho state holder class</h4>
+    <p>Với state holder class (xem <a href="#state-hoisting">State hoisting</a>), viết một <code>Saver</code> rồi truyền vào tham số <code>saver</code>:</p>
+    <pre><code class="language-kotlin">class StepperState(initialStep: Int) {
+    var step by mutableIntStateOf(initialStep)
+        private set
+    fun next() { step++ }
+    fun back() { if (step &gt; 0) step-- }
+
+    companion object {
+        val Saver: Saver&lt;StepperState, Int&gt; = Saver(
+            save = { it.step },               // chỉ lưu phần tối thiểu
+            restore = { StepperState(it) }
+        )
+    }
+}
+
+@Composable
+fun rememberStepperState(): StepperState =
+    rememberSaveable(saver = StepperState.Saver) { StepperState(0) }</code></pre>
+
+    <h4>SavedStateHandle trong ViewModel</h4>
+    <p>ViewModel sống qua xoay màn hình nhưng không qua process death. Với vài giá trị nhỏ cần khôi phục, nhận <code>SavedStateHandle</code> qua constructor; hàm <code>viewModel()</code> tự cung cấp nó (nếu dùng factory thì gọi <code>createSavedStateHandle()</code> trong <code>initializer</code>, xem <a href="#viewmodel">ViewModel</a>).</p>
+    <pre><code class="language-kotlin">class NotesViewModel(
+    private val savedStateHandle: SavedStateHandle
+) : ViewModel() {
+
+    // Luôn có giá trị, tự khôi phục sau process death
+    val selectedCategory: StateFlow&lt;String&gt; =
+        savedStateHandle.getStateFlow(KEY_CATEGORY, "all")
+
+    fun selectCategory(category: String) {
+        savedStateHandle[KEY_CATEGORY] = category
+    }
+
+    private companion object {
+        const val KEY_CATEGORY = "category"
+    }
+}</code></pre>
+
+    <h4>TextFieldState tự lưu</h4>
+    <p><code>rememberTextFieldState()</code> bên trong đã dùng cơ chế lưu với <code>Saver</code> riêng, nên nội dung người dùng đang gõ tự sống sót qua xoay màn hình và process death mà bạn không phải làm gì thêm (xem <a href="#textfield">TextField</a>). Tương tự, <code>rememberLazyListState()</code> và <code>rememberScrollState()</code> tự giữ vị trí cuộn.</p>
+
+    <div class="callout warn"><strong>Cảnh báo:</strong> Không lưu dữ liệu lớn (danh sách dài, ảnh, nội dung tải từ mạng) vào <code>rememberSaveable</code> hay <code>SavedStateHandle</code>. Bundle đi qua bộ đệm giao dịch Binder chỉ khoảng 1 MB dùng chung cho cả tiến trình; vượt quá sẽ gây lỗi <code>TransactionTooLargeException</code>. Hãy lưu id hoặc từ khóa, rồi tải lại dữ liệu từ Room hay repository.</div>
+
+    <h4>Cách thử process death</h4>
+    <ol>
+      <li>Bật <strong>Developer options</strong> (Tùy chọn cho nhà phát triển), bật mục <strong>Don't keep activities</strong> (không giữ lại Activity; tên hiển thị tiếng Việt tùy máy). Mỗi lần bạn rời Activity, nó bị hủy ngay; quay lại sẽ thấy state có được khôi phục không. Cách này kiểm tra lưu/khôi phục Bundle, nhưng tiến trình vẫn sống.</li>
+      <li>Để mô phỏng process death thật: mở app, nhập liệu, nhấn Home để đưa app xuống nền, rồi chạy lệnh dưới đây (thay bằng applicationId của bạn). Sau đó mở lại app từ Recents.</li>
+    </ol>
+    <pre><code class="language-bash">adb shell am kill com.example.notes</code></pre>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>Ví dụ 1: Tab dự báo thời tiết giữ nguyên khi xoay màn hình</h4>
+    <pre><code class="language-kotlin">import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+
+@Composable
+fun ForecastScreen(modifier: Modifier = Modifier) {
+    val tabs = listOf("Hôm nay", "7 ngày", "Tháng")
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }  // được lưu
+    var refreshCount by remember { mutableIntStateOf(0) }         // để so sánh: sẽ mất
+
+    Column(modifier.fillMaxSize().padding(16.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            tabs.forEachIndexed { index, title -&gt;
+                if (index == selectedTab) {
+                    Button(onClick = {}) { Text(title) }
+                } else {
+                    OutlinedButton(onClick = { selectedTab = index }) { Text(title) }
+                }
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+        when (selectedTab) {
+            0 -&gt; Text("Hà Nội: 27°C, mưa rào nhẹ buổi chiều")
+            1 -&gt; Text("Tuần này: nắng đầu tuần, mưa từ thứ Năm")
+            else -&gt; Text("Tháng 10: nhiệt độ trung bình 25°C")
+        }
+        Spacer(Modifier.height(16.dp))
+        TextButton(onClick = { refreshCount++ }) {
+            Text("Đã làm mới $refreshCount lần")
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Chọn tab "7 ngày" và bấm "Đã làm mới" vài lần, rồi xoay máy. Sau khi xoay, tab "7 ngày" vẫn được chọn, còn bộ đếm làm mới quay về 0 vì chỉ dùng <code>remember</code>. (Trong app thật bạn sẽ dùng thành phần tab của Material 3, xem <a href="#navigation-bar">Thanh điều hướng</a>.)</p>
+
+    <h4>Ví dụ 2: Form đặt bàn nhiều bước</h4>
+    <pre><code class="language-kotlin">import android.os.Parcelable
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import kotlinx.parcelize.Parcelize
+
+@Parcelize
+data class Branch(val id: Int, val name: String) : Parcelable
+
+val branches = listOf(
+    Branch(1, "Chi nhánh Quận 1"),
+    Branch(2, "Chi nhánh Thủ Đức"),
+    Branch(3, "Chi nhánh Hải Châu")
+)
+
+@Composable
+fun BookingForm(modifier: Modifier = Modifier) {
+    var step by rememberSaveable { mutableIntStateOf(1) }
+    val nameState = rememberTextFieldState()      // tự lưu, không cần rememberSaveable
+    val phoneState = rememberTextFieldState()
+    var branch by rememberSaveable { mutableStateOf&lt;Branch?&gt;(null) }  // Parcelable
+
+    val canGoNext = when (step) {
+        1 -&gt; nameState.text.isNotBlank() &amp;&amp; phoneState.text.isNotBlank()
+        2 -&gt; branch != null
+        else -&gt; true
+    }
+
+    Column(modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Bước $step / 3", style = MaterialTheme.typography.titleMedium)
+
+        when (step) {
+            1 -&gt; {
+                OutlinedTextField(state = nameState, label = { Text("Họ tên") })
+                OutlinedTextField(state = phoneState, label = { Text("Số điện thoại") })
+            }
+            2 -&gt; branches.forEach { item -&gt;
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = branch == item, onClick = { branch = item })
+                    Text(item.name)
+                }
+            }
+            else -&gt; Text("Xác nhận: ${nameState.text}, ${phoneState.text}, ${branch?.name}")
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (step &gt; 1) {
+                OutlinedButton(onClick = { step-- }) { Text("Quay lại") }
+            }
+            Button(onClick = { if (step &lt; 3) step++ }, enabled = canGoNext) {
+                Text(if (step &lt; 3) "Tiếp tục" else "Đặt bàn")
+            }
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Nhập tên và số điện thoại, sang bước 2 chọn "Chi nhánh Thủ Đức". Xoay máy hoặc thử <code>adb shell am kill</code> rồi mở lại từ Recents: form vẫn ở bước 2, chi nhánh vẫn được chọn, và khi quay lại bước 1 thì tên và số điện thoại vẫn còn nguyên.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li><strong>Chỉ lưu state giao diện nhỏ</strong> vào <code>rememberSaveable</code>/<code>SavedStateHandle</code>. Dữ liệu tải lại được (danh sách từ mạng) không cần lưu vào Bundle; lưu tham số để tải lại là đủ.</li>
+      <li><strong>Lỗi crash khi khôi phục:</strong> đặt một kiểu không phải Parcelable/Serializable (ví dụ data class thường) vào <code>rememberSaveable</code> sẽ gây lỗi lúc lưu. Thêm <code>@Parcelize</code> hoặc viết <code>Saver</code>.</li>
+      <li><strong>Đừng dùng <code>android:configChanges</code> để "chữa" mất state.</strong> Kể cả khi bạn tự xử lý xoay màn hình, process death vẫn xảy ra và state vẫn mất nếu không lưu.</li>
+      <li><strong>ViewModel không thay thế <code>rememberSaveable</code></strong> cho process death; nếu state nằm trong ViewModel, dùng thêm <code>SavedStateHandle</code> cho phần cần khôi phục.</li>
+      <li><strong>Đặt key cố định</strong> cho <code>SavedStateHandle</code> bằng hằng số để tránh gõ sai tên giữa lúc đọc và ghi.</li>
+      <li><strong>Kiểm tra cả hai tình huống</strong> (xoay màn hình và process death) mỗi khi thêm state quan trọng; nhiều lỗi chỉ lộ ra ở tình huống thứ hai.</li>
+    </ul>
+    <div class="callout tip"><strong>Mẹo:</strong> Nguyên tắc nhanh: state giao diện thuần (đang mở gì, chọn gì, gõ gì) dùng <code>rememberSaveable</code>; state gắn với logic màn hình dùng ViewModel + <code>SavedStateHandle</code>; dữ liệu của người dùng dùng DataStore/Room.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/state-saving?hl=vi" target="_blank" rel="noopener">Save UI state in Compose</a>, <a href="https://developer.android.com/topic/libraries/architecture/saving-states?hl=vi" target="_blank" rel="noopener">Save UI states</a></p>
+</section>

@@ -1,0 +1,285 @@
+<section class="topic" id="animation-nang-cao" data-title="Animation nâng cao">
+  <h2>Animation nâng cao: Transition, Animatable và lặp vô hạn</h2>
+  <p class="lead">Khi một trạng thái làm đổi nhiều thuộc tính cùng lúc, khi cần hiệu ứng lặp mãi, hoặc khi chuyển động phải bám theo ngón tay, các API cơ bản như <code>animate*AsState</code> không còn đủ. Phần này giới thiệu bộ công cụ "điều khiển bằng tay" của Compose để làm những animation đó gọn và mượt.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p>Ở phần <a href="#animation-co-ban">Animation cơ bản</a>, mỗi giá trị được animate độc lập: trạng thái đổi, Compose tự chạy từ giá trị cũ sang giá trị mới. Ba API nâng cao sau đây cho bạn nhiều quyền kiểm soát hơn:</p>
+    <ul>
+      <li><strong><code>Transition</code></strong> (tạo bằng <code>updateTransition</code>): một "nhạc trưởng" gắn với một trạng thái. Mọi giá trị con (màu, kích thước, độ dày viền…) khai báo trên cùng một transition sẽ bắt đầu và kết thúc đồng bộ.</li>
+      <li><strong><code>InfiniteTransition</code></strong> (tạo bằng <code>rememberInfiniteTransition</code>): chạy lặp đi lặp lại không ngừng chừng nào composable còn trên màn hình; hợp cho hiệu ứng nhấp nháy, xoay vòng, khung chờ tải (skeleton loading).</li>
+      <li><strong><code>Animatable</code></strong>: một "giá trị biết tự chuyển động" mà bạn ra lệnh trực tiếp bằng các hàm <code>suspend</code> (<code>animateTo</code>, <code>snapTo</code>, <code>animateDecay</code>) bên trong coroutine. Đây là lựa chọn số một cho animation đi theo cử chỉ.</li>
+    </ul>
+    <p>Cả ba đều nhận một <code>AnimationSpec</code> — "công thức chuyển động" mô tả giá trị đi từ đầu đến cuối ra sao: nảy như lò xo (<code>spring</code>), chạy trong thời lượng cố định (<code>tween</code>), đi qua các mốc (<code>keyframes</code>)… Nếu từng dùng hệ View, có thể hình dung <code>Transition</code> giống <code>AnimatorSet</code> chạy song song, <code>InfiniteTransition</code> giống <code>ValueAnimator</code> với số lần lặp vô hạn, còn <code>Animatable</code> giống <code>SpringAnimation</code>/<code>FlingAnimation</code>. Khác biệt lớn: trong Compose, animation tự dừng và dọn dẹp khi composable rời khỏi màn hình.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Nhu cầu</th><th>API nên dùng</th></tr></thead>
+      <tbody>
+        <tr><td>Một giá trị đổi theo một state</td><td><code>animate*AsState</code> (xem <a href="#animation-co-ban">phần cơ bản</a>)</td></tr>
+        <tr><td>Nhiều giá trị cùng đổi theo một state, cần đồng bộ</td><td><code>updateTransition</code></td></tr>
+        <tr><td>Lặp mãi, không phụ thuộc state</td><td><code>rememberInfiniteTransition</code></td></tr>
+        <tr><td>Bắt đầu/dừng bằng code, đi theo ngón tay, cần vận tốc</td><td><code>Animatable</code></td></tr>
+        <tr><td>Một phần tử "bay" từ bố cục này sang bố cục khác</td><td>Shared element transitions</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>1. <code>updateTransition</code>: nhiều giá trị, một nhịp</h4>
+    <ol>
+      <li>Gọi <code>updateTransition(targetState = …, label = "…")</code> với state điều khiển (thường là <code>Boolean</code> hoặc một <code>enum</code>).</li>
+      <li>Khai báo từng giá trị con bằng <code>animateDp</code>, <code>animateFloat</code>, <code>animateColor</code>, <code>animateOffset</code>… Lambda cuối nhận trạng thái và trả về giá trị tương ứng.</li>
+      <li>Tùy chỉnh chuyển động riêng cho từng giá trị qua <code>transitionSpec</code>; dùng <code>isTransitioningTo</code> để chọn spec theo chiều chuyển.</li>
+    </ol>
+    <pre><code class="language-kotlin">val transition = updateTransition(targetState = dangMo, label = "ngan-keo")
+val doCao by transition.animateDp(
+    transitionSpec = {
+        if (false isTransitioningTo true) spring(stiffness = Spring.StiffnessLow)
+        else tween(durationMillis = 200)
+    },
+    label = "doCao"
+) { mo -> if (mo) 240.dp else 0.dp }</code></pre>
+    <p>Tham số <code>label</code> không ảnh hưởng tới hành vi, nhưng là tên hiển thị trong công cụ Animation Preview — hãy luôn đặt tên dễ hiểu.</p>
+
+    <h4>2. <code>rememberInfiniteTransition</code>: lặp vô hạn</h4>
+    <p>Tạo transition một lần, rồi khai báo giá trị bằng <code>animateFloat</code>/<code>animateColor</code> với <code>initialValue</code>, <code>targetValue</code> và một <code>infiniteRepeatable(…)</code>. <code>RepeatMode.Restart</code> nhảy về đầu sau mỗi vòng; <code>RepeatMode.Reverse</code> chạy ngược lại (đi – về), hợp cho hiệu ứng "thở".</p>
+
+    <h4>3. <code>Animatable</code>: điều khiển trực tiếp</h4>
+    <ul>
+      <li>Tạo trong <code>remember { Animatable(0f) }</code>. Với kiểu khác <code>Float</code>/<code>Color</code>, truyền thêm bộ chuyển đổi, ví dụ <code>Animatable(Offset.Zero, Offset.VectorConverter)</code>.</li>
+      <li><code>animateTo(đích, spec)</code>: chạy tới đích; <code>snapTo(giáTrị)</code>: đặt ngay không animation; <code>animateDecay(vậnTốc, decaySpec)</code>: trượt chậm dần theo quán tính (dùng với <code>rememberSplineBasedDecay()</code> hoặc <code>exponentialDecay()</code>); <code>stop()</code>: dừng.</li>
+      <li>Đều là hàm <code>suspend</code>: gọi trong <code>LaunchedEffect</code> (chạy theo state) hoặc trong <code>rememberCoroutineScope().launch { }</code> (chạy theo sự kiện như chạm, kéo). Xem <a href="#side-effects">Side effects</a>.</li>
+      <li>Gọi <code>animateTo</code> mới khi animation cũ đang chạy sẽ hủy animation cũ và tiếp tục từ vị trí, vận tốc hiện tại — nhờ vậy cử chỉ ngắt ngang vẫn mượt.</li>
+      <li><code>updateBounds(lowerBound, upperBound)</code> giới hạn phạm vi; animation dừng khi chạm biên.</li>
+    </ul>
+    <pre><code class="language-kotlin">@Composable
+fun HuyHieuThongBao(soThongBao: Int) {
+    val tiLe = remember { Animatable(1f) }
+    LaunchedEffect(soThongBao) {
+        tiLe.snapTo(1.4f)          // phóng to tức thì
+        tiLe.animateTo(            // rồi nảy về kích thước gốc
+            targetValue = 1f,
+            animationSpec = spring(dampingRatio = Spring.DampingRatioHighBouncy)
+        )
+    }
+    Badge(Modifier.graphicsLayer { scaleX = tiLe.value; scaleY = tiLe.value }) {
+        Text("$soThongBao")
+    }
+}</code></pre>
+
+    <h4>4. Bảng <code>AnimationSpec</code></h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Spec</th><th>Đặc điểm</th><th>Ví dụ</th></tr></thead>
+      <tbody>
+        <tr><td><code>spring</code></td><td>Mô phỏng lò xo, không có thời lượng cố định, giữ vận tốc khi bị ngắt giữa chừng nên mượt nhất cho tương tác. Mặc định của phần lớn API.</td><td><code>spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)</code></td></tr>
+        <tr><td><code>tween</code></td><td>Chạy đúng N mili giây theo một đường cong tốc độ (easing). Mặc định 300 ms với <code>FastOutSlowInEasing</code>.</td><td><code>tween(durationMillis = 500, easing = LinearEasing)</code></td></tr>
+        <tr><td><code>keyframes</code></td><td>Đặt giá trị tại từng mốc thời gian, Compose nội suy phần giữa.</td><td><code>keyframes { durationMillis = 600; 1.3f at 150; 0.9f at 400 }</code></td></tr>
+        <tr><td><code>repeatable</code></td><td>Lặp một spec có thời lượng N lần.</td><td><code>repeatable(iterations = 3, animation = tween(200), repeatMode = RepeatMode.Reverse)</code></td></tr>
+        <tr><td><code>infiniteRepeatable</code></td><td>Lặp mãi; dùng với <code>rememberInfiniteTransition</code> hoặc <code>Animatable</code>.</td><td><code>infiniteRepeatable(tween(800), RepeatMode.Reverse)</code></td></tr>
+        <tr><td><code>snap</code></td><td>Nhảy ngay tới giá trị cuối (có thể kèm độ trễ).</td><td><code>snap(delayMillis = 100)</code></td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li><strong>Độ nảy</strong> <code>dampingRatio</code>: <code>Spring.DampingRatioNoBouncy</code> (mặc định, không nảy), <code>DampingRatioLowBouncy</code>, <code>DampingRatioMediumBouncy</code>, <code>DampingRatioHighBouncy</code> (nảy nhiều nhất).</li>
+      <li><strong>Độ cứng</strong> <code>stiffness</code>: <code>StiffnessHigh</code>, <code>StiffnessMedium</code> (mặc định), <code>StiffnessMediumLow</code>, <code>StiffnessLow</code>, <code>StiffnessVeryLow</code> — càng thấp, về đích càng chậm.</li>
+      <li><strong>Easing</strong>: <code>FastOutSlowInEasing</code> (tự nhiên cho vật di chuyển), <code>LinearOutSlowInEasing</code> (vật đi vào), <code>FastOutLinearInEasing</code> (vật rời đi), <code>LinearEasing</code> (đều, hợp xoay vòng hay đổi độ mờ), hoặc tự định nghĩa bằng <code>CubicBezierEasing(a, b, c, d)</code>.</li>
+    </ul>
+
+    <h4>5. Shared element transitions (giới thiệu)</h4>
+    <p>"Phần tử dùng chung" là kỹ thuật cho một phần tử — ảnh sản phẩm, ảnh đại diện — chuyển động liền mạch từ vị trí ở bố cục này sang vị trí ở bố cục kia (ví dụ từ danh sách sang trang chi tiết). Bọc nội dung trong <code>SharedTransitionLayout</code>, chuyển giữa hai bố cục bằng <code>AnimatedContent</code> (hoặc Navigation), rồi đánh dấu hai phần tử tương ứng bằng <code>Modifier.sharedElement</code> với <strong>cùng một key</strong>. API này có thể yêu cầu <code>@OptIn(ExperimentalSharedTransitionApi::class)</code> tùy phiên bản.</p>
+    <pre><code class="language-kotlin">@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+fun AnhDaiDienMoRong() {
+    var moRong by remember { mutableStateOf(false) }
+    SharedTransitionLayout {
+        AnimatedContent(targetState = moRong, label = "anhDaiDien") { lon -&gt;
+            Box(
+                Modifier
+                    .sharedElement(
+                        rememberSharedContentState(key = "anh-dai-dien"),
+                        animatedVisibilityScope = this@AnimatedContent
+                    )
+                    .size(if (lon) 240.dp else 64.dp)
+                    .background(MaterialTheme.colorScheme.tertiary, RoundedCornerShape(16.dp))
+                    .clickable { moRong = !moRong }
+            )
+        }
+    }
+}</code></pre>
+
+    <h4>6. Animation Preview trong Android Studio</h4>
+    <p>Khi một hàm <code>@Preview</code> chứa animation được hỗ trợ (chẳng hạn <code>updateTransition</code>, <code>AnimatedVisibility</code>, <code>AnimatedContent</code>, <code>animate*AsState</code>, <code>rememberInfiniteTransition</code>), khung preview hiện nút mở <strong>Animation Preview</strong>. Tại đây bạn phát/tạm dừng, kéo thanh thời gian từng khung hình, chọn trạng thái đầu – cuối và xem đường cong của từng giá trị theo <code>label</code> — rất tiện để tinh chỉnh spec mà không cần chạy app.</p>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>Ví dụ 1: Ô chọn gói cước đổi viền, nền và kích thước cùng lúc</h4>
+    <p class="code-caption">Ba giá trị dùng chung một <code>Transition</code> nên luôn khớp nhịp nhau.</p>
+    <pre><code class="language-kotlin">@Composable
+fun OGoiCuoc(
+    tenGoi: String,
+    gia: String,
+    duocChon: Boolean,
+    onChon: () -&gt; Unit,
+    modifier: Modifier = Modifier
+) {
+    val transition = updateTransition(targetState = duocChon, label = "goiCuoc")
+
+    val doDayVien by transition.animateDp(label = "doDayVien") { chon -&gt;
+        if (chon) 3.dp else 1.dp
+    }
+    val mauVien by transition.animateColor(label = "mauVien") { chon -&gt;
+        if (chon) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+    }
+    val mauNen by transition.animateColor(
+        transitionSpec = { tween(durationMillis = 400) },
+        label = "mauNen"
+    ) { chon -&gt;
+        if (chon) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+    }
+    val tiLe by transition.animateFloat(
+        transitionSpec = { spring(dampingRatio = Spring.DampingRatioMediumBouncy) },
+        label = "tiLe"
+    ) { chon -&gt;
+        if (chon) 1.05f else 1f
+    }
+
+    Surface(
+        selected = duocChon,
+        onClick = onChon,
+        shape = RoundedCornerShape(16.dp),
+        color = mauNen,
+        border = BorderStroke(doDayVien, mauVien),
+        modifier = modifier.graphicsLayer { scaleX = tiLe; scaleY = tiLe }
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text(tenGoi, style = MaterialTheme.typography.titleMedium)
+            Text(gia, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun ChonGoiCuocPreview() {
+    var goiDangChon by remember { mutableStateOf("Tiêu chuẩn") }
+    Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        listOf("Cơ bản" to "49.000đ/tháng", "Tiêu chuẩn" to "99.000đ/tháng", "Cao cấp" to "199.000đ/tháng")
+            .forEach { (ten, gia) -&gt;
+                OGoiCuoc(
+                    tenGoi = ten,
+                    gia = gia,
+                    duocChon = ten == goiDangChon,
+                    onChon = { goiDangChon = ten },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Ba ô gói cước xếp dọc. Chạm vào một ô: viền dày lên và đổi sang màu chủ đạo, nền chuyển dần sang màu nhấn, ô phóng to nhẹ rồi nảy; ô vừa bỏ chọn đồng thời co về trạng thái thường.</p>
+
+    <h4>Ví dụ 2: Khung chờ tải (skeleton) nhấp nháy</h4>
+    <pre><code class="language-kotlin">@Composable
+fun DongSkeleton(modifier: Modifier = Modifier) {
+    val vongLap = rememberInfiniteTransition(label = "skeleton")
+    val doMo by vongLap.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 800, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "doMo"
+    )
+    val mauKhoi = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+    // Đọc doMo trong graphicsLayer: chỉ vẽ lại, không recompose mỗi khung hình
+    val nhapNhay = Modifier.graphicsLayer { alpha = doMo }
+
+    Row(modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(nhapNhay.size(48.dp).background(mauKhoi, CircleShape))
+        Spacer(Modifier.width(12.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(nhapNhay.fillMaxWidth(0.7f).height(14.dp).background(mauKhoi, RoundedCornerShape(4.dp)))
+            Box(nhapNhay.fillMaxWidth(0.4f).height(14.dp).background(mauKhoi, RoundedCornerShape(4.dp)))
+        }
+    }
+}
+
+@Composable
+fun DanhBaDangTai() {
+    var dangTai by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        delay(2500)   // giả lập tải dữ liệu
+        dangTai = false
+    }
+    Column {
+        if (dangTai) {
+            repeat(4) { DongSkeleton() }
+        } else {
+            listOf("An", "Bình", "Chi", "Dũng").forEach { ten -&gt;
+                ListItem(headlineContent = { Text(ten) })
+            }
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Trong 2,5 giây đầu, bốn dòng xám (hình tròn và hai thanh) mờ dần rồi rõ dần liên tục; sau đó danh sách tên thật thay thế và vòng lặp tự dừng vì <code>DongSkeleton</code> đã rời màn hình.</p>
+
+    <h4>Ví dụ 3: Thẻ kéo được, thả ra thì bật về chỗ cũ</h4>
+    <p class="code-caption">Cần <code>import androidx.compose.animation.core.VectorConverter</code> và <code>kotlin.math.roundToInt</code>.</p>
+    <pre><code class="language-kotlin">@Composable
+fun TheKeoBatVe() {
+    val viTri = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
+    val scope = rememberCoroutineScope()
+    val veChoCu: () -&gt; Unit = {
+        scope.launch {
+            viTri.animateTo(
+                targetValue = Offset.Zero,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessLow
+                )
+            )
+        }
+    }
+
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Card(
+            modifier = Modifier
+                .offset { IntOffset(viTri.value.x.roundToInt(), viTri.value.y.roundToInt()) }
+                .size(width = 220.dp, height = 140.dp)
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDragEnd = veChoCu,
+                        onDragCancel = veChoCu,
+                        onDrag = { change, luongKeo -&gt;
+                            change.consume()
+                            // Bám theo ngón tay: đặt giá trị ngay, không animation
+                            scope.launch { viTri.snapTo(viTri.value + luongKeo) }
+                        }
+                    )
+                }
+        ) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Kéo tôi rồi thả ra")
+            }
+        }
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Thẻ đi theo ngón tay theo mọi hướng. Khi buông tay, thẻ lao về giữa màn hình, vượt quá một chút rồi nảy qua lại vài lần trước khi đứng yên. Nếu chạm lại giữa chừng, thẻ dừng ngay dưới ngón tay và tiếp tục kéo được.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li><strong>Luôn <code>remember</code> <code>Animatable</code>.</strong> Viết <code>val x = Animatable(0f)</code> trực tiếp trong thân composable sẽ tạo đối tượng mới mỗi lần recompose, animation bị reset liên tục.</li>
+      <li><strong><code>repeatable</code>/<code>infiniteRepeatable</code> chỉ nhận spec có thời lượng</strong> (<code>tween</code>, <code>keyframes</code>, <code>snap</code>), không nhận <code>spring</code>.</li>
+      <li><strong>Đọc giá trị animation càng muộn càng tốt.</strong> Đưa vào <code>graphicsLayer { }</code>, <code>offset { }</code> hay <code>drawBehind { }</code> để chỉ vẽ lại thay vì recompose mỗi khung hình (xem <a href="#performance">Hiệu năng</a>).</li>
+      <li><strong>Chọn đúng key cho <code>LaunchedEffect</code></strong> chứa <code>animateTo</code>: key đổi thì animation cũ bị hủy và chạy lại; dùng <code>Unit</code> nếu chỉ muốn chạy một lần khi xuất hiện.</li>
+      <li><strong>Ưu tiên <code>spring</code> cho thứ người dùng chạm vào</strong>: khi bị ngắt giữa chừng, nó giữ vận tốc nên không bị giật như <code>tween</code>.</li>
+      <li><strong>Tôn trọng người dùng nhạy cảm với chuyển động.</strong> Android có tùy chọn tắt/giảm animation trong phần cài đặt Hỗ trợ tiếp cận; animation Compose nhìn chung tuân theo hệ số tốc độ animation của hệ thống. Đừng để chức năng phụ thuộc vào việc animation chạy xong, tránh nhấp nháy nhanh hoặc chuyển động lớn kéo dài, và cân nhắc thêm tùy chọn "giảm hiệu ứng" trong app (xem <a href="#accessibility">Hỗ trợ tiếp cận</a>).</li>
+    </ul>
+    <div class="callout tip"><strong>Mẹo:</strong> Đặt <code>label</code> cho mọi <code>updateTransition</code>, <code>rememberInfiniteTransition</code> và từng giá trị con. Khi mở Animation Preview, bạn sẽ thấy ngay tên từng đường cong thay vì những nhãn mặc định khó phân biệt.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/animation/introduction?hl=vi" target="_blank" rel="noopener">Animation trong Compose</a></p>
+</section>

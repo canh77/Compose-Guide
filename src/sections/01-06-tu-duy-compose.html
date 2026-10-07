@@ -1,0 +1,132 @@
+<section class="topic" id="tu-duy-compose" data-title="Tư duy Compose">
+  <h2>Tư duy trong Compose</h2>
+  <p class="lead">Compose không chỉ là một cú pháp mới mà là một cách nghĩ khác về giao diện: bạn mô tả giao diện cho từng trạng thái, còn Compose quyết định khi nào và phần nào cần vẽ lại. Hiểu đúng điều này giúp tránh phần lớn lỗi khó hiểu mà người mới hay gặp.</p>
+
+  <div class="block block-def">
+    <h3>Định nghĩa</h3>
+    <p>Trong mô hình <strong>khai báo</strong>, giao diện là một hàm của trạng thái: <strong>UI = f(state)</strong>. Hàm composable nhận dữ liệu và mô tả giao diện tương ứng; nó không giữ tham chiếu tới phần tử nào để sửa sau này. Muốn giao diện thay đổi, bạn thay đổi <em>dữ liệu</em>, rồi Compose gọi lại hàm với dữ liệu mới.</p>
+    <p>Việc gọi lại các hàm composable khi dữ liệu đầu vào thay đổi gọi là <strong>recomposition</strong> (tái tổ hợp). Compose theo dõi hàm nào <em>đọc</em> state nào. Khi một state thay đổi, chỉ những hàm (chính xác hơn là những phạm vi code) có đọc state đó mới được lên lịch chạy lại; các composable con có tham số không đổi sẽ được <strong>bỏ qua</strong> (skip). Cơ chế này gọi là <em>smart recomposition</em>, giúp cập nhật nhanh dù bạn "vẽ lại" về mặt khái niệm.</p>
+    <p>So với View: ở đó bạn giữ đối tượng <code>TextView</code> và gọi <code>setText</code>. Ở Compose không có đối tượng nào để giữ — chỉ có hàm và state. Đây là lý do code Compose ngắn hơn nhưng đòi hỏi bạn tuân thủ vài quy tắc nghiêm ngặt về cách viết hàm.</p>
+  </div>
+
+  <div class="block block-use">
+    <h3>Cách dùng</h3>
+    <h4>Những điều Compose có thể làm với hàm của bạn</h4>
+    <div class="table-wrap"><table>
+      <thead>
+        <tr><th>Đặc điểm</th><th>Ý nghĩa</th><th>Hệ quả khi viết code</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Chạy lại bất cứ lúc nào</td><td>Mỗi khi state được đọc thay đổi, hàm có thể chạy lại</td><td>Không giả định hàm chỉ chạy một lần</td></tr>
+        <tr><td>Chạy rất thường xuyên</td><td>Trong lúc animation, một số hàm có thể chạy mỗi khung hình (60–120 lần/giây)</td><td>Không làm việc nặng (đọc file, sắp xếp danh sách lớn) trong thân hàm</td></tr>
+        <tr><td>Bị bỏ qua (skip)</td><td>Nếu tham số không đổi, Compose có thể không gọi hàm con</td><td>Không dựa vào việc hàm con "chắc chắn chạy" để làm gì đó</td></tr>
+        <tr><td>Thứ tự bất kỳ</td><td>Compose không cam kết thứ tự chạy giữa các hàm anh em</td><td>Hàm này không được phụ thuộc vào biến do hàm kia ghi</td></tr>
+        <tr><td>Bị hủy giữa chừng</td><td>Recomposition mang tính "lạc quan": nếu state lại đổi trước khi xong, Compose có thể bỏ kết quả dở và làm lại</td><td>Mọi việc làm dở trong thân hàm có thể bị vứt đi</td></tr>
+      </tbody>
+    </table></div>
+
+    <h4>Quy tắc rút ra</h4>
+    <ol>
+      <li><strong>Idempotent:</strong> cùng đầu vào thì cho cùng giao diện, dù hàm chạy một lần hay một trăm lần.</li>
+      <li><strong>Không side effect trong thân hàm:</strong> không ghi biến bên ngoài, không ghi <code>SharedPreferences</code>, không gọi mạng, không ghi log thống kê. Những việc này đặt trong lambda sự kiện (như <code>onClick</code>) hoặc trong các API như <code>LaunchedEffect</code>, <code>SideEffect</code> — xem <a href="#side-effects">Side effects</a>.</li>
+      <li><strong>Nhanh:</strong> tính toán tốn kém thì đưa vào ViewModel, hoặc tối thiểu bọc trong <code>remember</code> để không lặp lại mỗi lần recomposition.</li>
+      <li><strong>Mọi dữ liệu thay đổi phải là state Compose theo dõi được</strong> (<code>mutableStateOf</code>, <code>StateFlow</code> được collect…). Biến Kotlin thường thay đổi sẽ không kích hoạt recomposition — xem <a href="#state-remember">State và remember</a>.</li>
+    </ol>
+
+    <h4>Ba giai đoạn của một khung hình</h4>
+    <p>Mỗi lần cập nhật, Compose đi qua ba giai đoạn: <strong>Composition</strong> (chạy hàm composable để biết hiển thị <em>cái gì</em>), <strong>Layout</strong> (đo và đặt <em>ở đâu</em>), <strong>Drawing</strong> (vẽ ra màn hình). Đọc state ở giai đoạn càng muộn thì càng ít việc phải làm lại. Chi tiết ở <a href="#vong-doi-giai-doan">Vòng đời và các giai đoạn</a>.</p>
+  </div>
+
+  <div class="block block-example">
+    <h3>Ví dụ</h3>
+    <h4>Ví dụ 1: Bộ đếm viết đúng cách</h4>
+    <pre><code class="language-kotlin">@Composable
+fun LikeButton(modifier: Modifier = Modifier) {
+    var likes by remember { mutableIntStateOf(0) }
+
+    Button(onClick = { likes++ }, modifier = modifier) {
+        Text("Thích ($likes)")
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Nút hiện "Thích (0)". Mỗi lần bấm, <code>likes</code> tăng trong lambda sự kiện (không phải trong thân hàm), state thay đổi, phần đọc <code>likes</code> được chạy lại và nút hiện "Thích (1)", "Thích (2)"…</p>
+
+    <h4>Ví dụ 2: Chỉ phần đọc state mới chạy lại</h4>
+    <pre><code class="language-kotlin">@Composable
+fun WeatherPanel() {
+    var city by remember { mutableStateOf("Hà Nội") }
+    var temperature by remember { mutableIntStateOf(28) }
+
+    Column(modifier = Modifier.padding(16.dp)) {
+        CityHeader(city = city)              // chỉ chạy lại khi city đổi
+        TemperatureText(value = temperature) // chỉ chạy lại khi temperature đổi
+        Row {
+            Button(onClick = { temperature++ }) { Text("+1°C") }
+            Button(onClick = { city = "Huế" }) { Text("Đổi sang Huế") }
+        }
+    }
+}
+
+@Composable
+fun CityHeader(city: String) {
+    Text(text = city, style = MaterialTheme.typography.headlineSmall)
+}
+
+@Composable
+fun TemperatureText(value: Int) {
+    Text(text = "$value°C", style = MaterialTheme.typography.displayMedium)
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Bấm "+1°C" thì số nhiệt độ tăng. Phía sau, <code>WeatherPanel</code> và <code>TemperatureText</code> chạy lại, còn <code>CityHeader</code> bị bỏ qua vì <code>city</code> vẫn là "Hà Nội". Bấm "Đổi sang Huế" thì điều ngược lại xảy ra.</p>
+
+    <h4>Ví dụ 3: Lỗi side effect trong thân hàm và cách sửa</h4>
+    <p class="code-caption">SAI: ghi vào danh sách bên ngoài trong lúc compose</p>
+    <pre><code class="language-kotlin">data class Note(val id: Long, val title: String)
+
+val viewedNoteIds = mutableListOf&lt;Long&gt;() // nằm ngoài composable
+
+@Composable
+fun NoteList(notes: List&lt;Note&gt;) {
+    Column {
+        notes.forEach { note -&gt;
+            viewedNoteIds.add(note.id) // SAI: side effect, chạy lại mỗi lần recomposition
+            Text(note.title)
+        }
+        Text("Đã xem ${viewedNoteIds.size} ghi chú") // con số sai và cứ tăng dần
+    }
+}</code></pre>
+    <p>Mỗi lần <code>NoteList</code> chạy lại (do danh sách đổi, do theme đổi, do cha recompose…), các id lại bị thêm vào lần nữa. Con số hiển thị không phản ánh dữ liệu thật, và vì <code>viewedNoteIds</code> không phải state nên giao diện cũng không cập nhật đúng lúc.</p>
+    <p class="code-caption">ĐÚNG: hiển thị tính từ tham số, side effect đưa vào LaunchedEffect</p>
+    <pre><code class="language-kotlin">@Composable
+fun NoteList(
+    notes: List&lt;Note&gt;,
+    onNotesShown: (List&lt;Long&gt;) -&gt; Unit,
+    modifier: Modifier = Modifier
+) {
+    // Chỉ chạy khi danh sách notes thực sự thay đổi, không chạy theo mỗi recomposition
+    LaunchedEffect(notes) {
+        onNotesShown(notes.map { it.id })
+    }
+
+    Column(modifier = modifier) {
+        notes.forEach { note -&gt;
+            Text(note.title)
+        }
+        Text("Đang hiển thị ${notes.size} ghi chú")
+    }
+}</code></pre>
+    <p class="result"><strong>Kết quả:</strong> Dòng cuối luôn hiển thị đúng số ghi chú hiện có. Việc ghi nhận "đã xem" được báo lên trên (ví dụ cho ViewModel xử lý) đúng một lần cho mỗi danh sách mới, dù hàm có recomposition bao nhiêu lần.</p>
+  </div>
+
+  <div class="block block-notes">
+    <h3>Chú ý</h3>
+    <ul>
+      <li>Thay đổi state ngay trong thân hàm (ví dụ viết <code>count++</code> trực tiếp, không nằm trong <code>onClick</code>) sẽ kích hoạt recomposition, recomposition lại chạy <code>count++</code>… tạo vòng lặp vô tận. Chỉ thay đổi state trong sự kiện hoặc effect.</li>
+      <li>Biến khai báo bằng <code>var x = 0</code> trong thân composable bị khởi tạo lại mỗi lần recomposition; dùng <code>remember { mutableStateOf(…) }</code> để giữ giá trị.</li>
+      <li>Đừng đếm số lần recomposition để làm logic, và đừng giả định thứ tự chạy giữa các composable anh em.</li>
+      <li>Truyền dữ liệu bất biến (data class <code>val</code>, <code>List</code> chỉ đọc) để Compose so sánh được và bỏ qua những phần không đổi. Từ Kotlin 2.0.20, chế độ <em>strong skipping</em> được bật mặc định nên cả composable có tham số không ổn định cũng có thể được bỏ qua — xem <a href="#performance">Hiệu năng</a>.</li>
+      <li>Muốn xem thực tế hàm nào recomposition bao nhiêu lần, dùng <em>Layout Inspector</em> của Android Studio (hiện số lần recomposition và số lần bị bỏ qua).</li>
+    </ul>
+    <div class="callout warn"><strong>Cảnh báo:</strong> Code trong thân composable chạy trên luồng giao diện. Gọi mạng, đọc database hay sắp xếp danh sách lớn ở đây sẽ làm giật hoặc treo app — luôn đưa vào ViewModel hoặc coroutine.</div>
+  </div>
+
+  <p class="source">Tài liệu gốc: <a href="https://developer.android.com/develop/ui/compose/mental-model?hl=vi" target="_blank" rel="noopener">Tư duy trong Compose</a></p>
+</section>
